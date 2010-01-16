@@ -1,0 +1,86 @@
+<Suppress Comment="Version 7.2.0 (Build 2254)">
+	<ErrType Category=8 >
+		<Module Name="mscomct2.ocx" >
+			<Address Value=0x0003C898 >
+			</Address>
+			<Address Value=0x0003C8A2 >
+			</Address>
+		</Module>
+	</ErrType>
+	<ErrType Category=38 >
+		<Module Name="wbtrv32.dll" >
+			<Address Value=0x00003957 >
+			</Address>
+		</Module>
+	</ErrType>
+	<ErrType Category=46 >
+		<ValidateMod Name="GDI32.DLL" >
+			<ValidateFunc Name="DeleteObject" >
+				<ValidateParm Value=1 >
+					<Module Name="MFC42D.DLL" >
+						<File Name="wingdi.cpp" >
+							<Function Name="public: int __thiscall CGdiObject::DeleteObject(void)" >
+							</Function>
+						</File>
+					</Module>
+					<Module Name="ToolkitPro1020vc60D.dll" >
+						<File Name="XTPPaintManager.cpp" >
+							<Function Name="public: virtual void __thiscall CXTPPaintManager::Animate(class CDC *,class CDC *,class CRect,enum XTPAnimationType)" >
+							</Function>
+						</File>
+					</Module>
+				</ValidateParm>
+			</ValidateFunc>
+			<ValidateFunc Name="SelectObject" >
+				<ValidateParm Value=2 >
+					<Module Name="MFC42D.DLL" >
+						<File Name="wingdi.cpp" >
+							<Function Name="protected: static class CGdiObject * __stdcall CDC::SelectGdiObject(struct HDC__ *,void *)" >
+							</Function>
+						</File>
+					</Module>
+					<Module Name="ToolkitPro1020vc60D.dll" >
+						<File Name="XTPDrawHelpers.cpp" >
+							<Function Name="public: virtual __thiscall CXTPBufferDC::~CXTPBufferDC(void)" >
+							</Function>
+						</File>
+						<File Name="XTPPaintManager.cpp" >
+							<Function Name="public: virtual void __thiscall CXTPPaintManager::Animate(class CDC *,class CDC *,class CRect,enum XTPAnimationType)" >
+							</Function>
+						</File>
+						<File Name="XTPShadowsManager.cpp" >
+							<Function Name="protected: void __thiscall CXTPShadowsManager::CShadowWnd::OnSize(unsigned int,int,int)" >
+							</Function>
+						</File>
+					</Module>
+				</ValidateParm>
+			</ValidateFunc>
+		</ValidateMod>
+		<ValidateMod Name="user32.dll" >
+			<ValidateFunc Name="ReleaseDC" >
+				<ValidateParm Value=2 >
+					<Module Name="MFC42D.DLL" >
+						<File Name="wingdi.cpp" >
+							<Function Name="public: virtual __thiscall CClientDC::~CClientDC(void)" >
+							</Function>
+							<Function Name="public: virtual __thiscall CWindowDC::~CWindowDC(void)" >
+							</Function>
+						</File>
+						<File Name="wingdix.cpp" >
+							<Function Name="public: int __thiscall CFont::CreatePointFontIndirect(struct tagLOGFONTA const *,class CDC *)" >
+							</Function>
+						</File>
+					</Module>
+					<Module Name="mscomct2.ocx" >
+						<Address Value=0x0003AEE7 >
+						</Address>
+					</Module>
+					<Module Name="vcf15.ocx" >
+						<Address Value=0x000441CA >
+						</Address>
+					</Module>
+				</ValidateParm>
+			</ValidateFunc>
+		</ValidateMod>
+	</ErrType>
+</Suppress>

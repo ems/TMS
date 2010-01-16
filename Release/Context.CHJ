@@ -1,0 +1,23 @@
+[PROJECT]
+Primary File=tms.exe
+Help File To Build=Context.HLP
+Database File=Context.DBF
+Run Command=tms.exe
+Help Project File=Context.HPJ
+DefaultTopicFile=Context.DTO
+HelpMapFile=Context.HH
+ExeTime=4230465536, 29809059
+[DATA]
+ProjectType=0
+RHAttached=0
+StartMapNum=10000
+VBFormBorder=0
+NextTopicNum=3003
+ControlCount=3003
+TopicIdPrefix=IDH_
+DefaultText=1
+[HELP TOPICS]
+FontName=Arial
+FontSize=160
+FontEfx=0
+FontCharSet=255

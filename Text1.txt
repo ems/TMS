@@ -1,0 +1,17 @@
+//
+//  See if this record has been "unregistered"
+//
+//  Save the existing record position
+// 
+      DAILYOPSrecordID = DAILYOPS.recordID;
+      btrieve(B_GETPOSITION, TMS_DAILYOPS, &absRecID, &DAILYOPSKey1, 1);
+//
+//  Find the record
+//
+      DAILYOPSKey2.DAILYOPSrecordID = DAILYOPS.recordID;
+      bFound = (btrieve(B_GETEQUAL, TMS_DAILYOPS, &DAILYOPS, &DAILYOPSKey2, 2) == 0);
+//
+//  Re-establish position
+//
+      DAILYOPS.recordID = absRecID;
+      btrieve(B_GETDIRECT, TMS_DAILYOPS, &DAILYOPS, &DAILYOPSKey1, 1);

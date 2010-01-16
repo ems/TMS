@@ -1,0 +1,752 @@
+Daily Ops Database Functions
+
+Keys:
+
+//
+//  Key 1 : Record type : "Pertains to" Date : "Pertains to" Time : Record Flags
+//
+typedef struct DAILYOPSKey1Struct
+{
+  char   recordTypeFlag;
+  long   pertainsToDate;
+  long   pertainsToTime;
+  long   recordFlags;
+} DAILYOPSKey1Def;
+
+//
+//  Key 2 : DAILYOPSrecordID (this is a "referred by" record ID)
+//
+typedef struct DAILYOPSKey2Struct
+{
+  long   DAILYOPSrecordID;
+} DAILYOPSKey2Def;
+
+//
+//  Key 3 : DRIVERSrecordID : "Pertains to" Date : "Pertains to" Time : Record type : Record Flags
+//
+typedef struct DAILYOPSKey3Struct
+{
+  long   DRIVERSrecordID;
+  long   pertainsToDate;
+  long   pertainsToTime;
+  char   recordTypeFlag;
+  long   recordFlags;
+} DAILYOPSKey3Def;
+
+//
+//  Key 4 : User ID : "Pertains to" Date : "Pertains to" Time : Record type : Record Flags
+//
+typedef struct DAILYOPSKey4Struct
+{
+  char   userID;
+  long   pertainsToDate;
+  long   pertainsToTime;
+  char   recordTypeFlag;
+  long   recordFlags;
+} DAILYOPSKey4Def;
+
+//
+//  Key 5 : Date/Time of Entry : "Pertains to" Date : "Pertains to" Time : Record type : Record Flags
+//
+typedef struct DAILYOPSKey5Struct
+{
+  time_t entryDateAndTime;
+  long   pertainsToDate;
+  long   pertainsToTime;
+  char   recordTypeFlag;
+  long   recordFlags;
+} DAILYOPSKey5Def;
+
+
+Functions:
+
+Establish a Roster Template
+===========================
+
+  CTime time = CTime::GetCurrentTime();
+  long  datenow = time.GetYear() * 10000 + time.GetMonth() * 100 + time.GetDay();
+  long  timenow = time.GetHour() * 3600 + time.GetMinute() * 60 + time.GetSecond();
+  ROSTERKey1.DIVISIONSrecordID = m_DivisionRecordID;
+  ROSTERKey1.rosterNumber = NO_RECORD;
+  rcode2 = btrieve(B_GETGREATER, TMS_ROSTER, &ROSTER, &ROSTERKey1, 1);
+  while(rcode2 == 0 &&
+        ROSTER.DIVISIONSrecordID == m_DivisionRecordID)
+  {
+    rcode2 = btrieve(B_GETLAST, TMS_DAILYOPS, &DAILYOPS, &DAILYOPSKey0, 0);
+    DAILYOPS.recordID = AssignRecID(rcode2, DAILYOPS.recordID);
+    DAILYOPS.entryDateAndTime = time.GetTime();
+    DAILYOPS.pertainsToDate = datenow;
+    DAILYOPS.pertainsToTime = timenow;
+    DAILYOPS.recordTypeFlag = DAILYOPS_FLAG_ROSTER;
+    DAILYOPS.recordFlags = DAILYOPS_FLAG_ROSTERESTABLISH;
+    DAILYOPS.userID = m_UserID;
+    DAILYOPS.DRIVERSrecordID = ROSTER.DRIVERSrecordID;
+    DAILYOPS.DAILYOPSrecordID = NO_RECORD;
+    memset(DAILYOPS.DOPS.associatedData, 0x00, DAILYOPS_ASSOCIATEDDATA_LENGTH);
+    DAILYOPS.DOPS.RosterTemplate.ROSTERrecordID = ROSTER.recordID;
+    rcode2 = btrieve(B_INSERT, TMS_DAILYOPS, &DAILYOPS, &DAILYOPSKey0, 0);
+    rcode2 = btrieve(B_GETNEXT, TMS_ROSTER, &ROSTER, &ROSTERKey1, 1);
+  }
+
+
+Get Roster Template prior to a specific date (normally today)
+=============================================================
+
+Notes: Single call
+
+  DAILYOPSKey1.recordTypeFlag = DAILYOPS_FLAG_ROSTER;
+  DAILYOPSKey1.pertainsToDate = YYYYMMDD;
+  DAILYOPSKey1.pertainsToTime = m_SystemTime.GetHour() * 3600 + m_SystemTime.GetMinute() * 60 + m_SystemTime.GetSecond();
+  DAILYOPSKey1.recordFlags = 0;
+  rcode2 = btrieve(B_GETLESSTHANOREQUAL, TMS_DAILYOPS, &DAILYOPS, &DAILYOPSKey1, 1);
+  if(rcode2 == 0 && (DAILYOPS.recordTypeFlag & DAILYOPS_FLAG_ROSTER))
+  {
+  }
+
+
+Look for a bus marked out of service
+====================================
+
+Notes: Look backward to see if a bus has been put out of
+       service, then forward to see if it's been put back
+
+  DAILYOPSKey1.recordTypeFlag = DAILYOPS_FLAG_BUS;
+  DAILYOPSKey1.pertainsToDate = YYYYMMDD;
+  DAILYOPSKey1.pertainsToTime = m_SystemTime.GetHour() * 3600 + m_SystemTime.GetMinute() * 60 + m_SystemTime.GetSecond();
+  DAILYOPSKey1.recordFlags = 0;
+  rcode2 = btrieve(B_GETLESSTHANOREQUAL, TMS_DAILYOPS, &DAILYOPS, &DAILYOPSKey1, 1);
+  while(rcode2 == 0 &&
+        (DAILYOPS.recordTypeFlag & DAILYOPS_FLAG_BUS) &&
+        (DAILYOPS.dateOfEntry / 10000) + 1 >= time.GetYear())  // Go back a year - used as a "shut up" point
+  {
+    if(DAILYOPS.DOPS.Bus.flags & DAILYOPS_FLAG_BUSMARKEDOUTOFSERVICE)
+    {
+      if(DAILYOPS.DOPS.Bus.BUSESrecordID == BUSES.recordID)
+      {
+        DAILYOPSrecordID = DAILYOPS.recordID;
+        btrieve(B_GETPOSITION, TMS_DAILYOPS, &absRecID, &DAILYOPSKey1, 1);
+        DAILYOPSKey2.DAILYOPSrecordID = DAILYOPS.recordID;
+        bFound = (btrieve(B_GETEQUAL, TMS_DAILYOPS, &DAILYOPS, &DAILYOPSKey2, 2) == 0);
+        if(bFound)
+        {
+          break;
+        }
+        DAILYOPS.recordID = absRecID;
+        btrieve(B_GETDIRECT, TMS_DAILYOPS, &DAILYOPS, &DAILYOPSKey1, 1);
+      }
+    }
+    rcode2 = btrieve(B_GETPREVIOUS, TMS_DAILYOPS, &DAILYOPS, &DAILYOPSKey1, 1);
+  }
+
+
+Assign a bus to a block
+=======================
+
+  DailyOpsBuildRecord(&DAILYOPS, DAILYOPS_FLAG_BUS);
+  DAILYOPS.DOPS.Bus.flags = DAILYOPS_FLAG_BUSASSIGNMENT;
+  DAILYOPS.DOPS.Bus.BUSESrecordID = m_BusAssignmentInfo[m_SelectedTBAIndex].BUSESrecordID;
+  DAILYOPS.DOPS.Bus.TRIPSrecordID = m_BusAssignmentInfo[m_SelectedTBAIndex].TRIPSrecordID;
+  DAILYOPS.DOPS.Bus.RGRPROUTESrecordID = m_BusAssignmentInfo[m_SelectedTBAIndex].RGRPRecordID;
+  DAILYOPS.DOPS.Bus.SGRPSERVICESrecordID = m_BusAssignmentInfo[m_SelectedTBAIndex].SGRPRecordID;
+  DAILYOPS.DOPS.Bus.DAILYOPSrecordID = NO_RECORD;
+  DAILYOPS.DOPS.Bus.newBUSESrecordID = NO_RECORD;
+  DAILYOPS.DOPS.Bus.blockNumber = m_BusAssignmentInfo[m_SelectedTBAIndex].blockNumber;
+  DAILYOPS.DOPS.Bus.date = m_VehicleAssignmentDate;
+  rcode2 = btrieve(B_INSERT, TMS_DAILYOPS, &DAILYOPS, &DAILYOPSKey0, 0);
+
+
+Return a bus
+============
+
+  DAILYOPSKey0.recordID = GetBusAssignedRecord(m_SelectedASSIndex, TRUE);
+  rcode2 = btrieve(B_GETEQUAL, TMS_DAILYOPS, &DO, &DAILYOPSKey0, 0);
+  DailyOpsBuildRecord(&DAILYOPS, DAILYOPS_FLAG_BUS);
+  DAILYOPS.pertainsToDate = DO.pertainsToDate;
+  DAILYOPS.recordFlags = DAILYOPS_FLAG_BUSRETURN;
+  DAILYOPS.DAILYOPSrecordID = DO.recordID;
+  rcode2 = btrieve(B_INSERT, TMS_DAILYOPS, &DAILYOPS, &DAILYOPSKey0, 0);
+
+
+"Drop" a block on a given date
+==============================
+
+  DailyOpsBuildRecord(&DAILYOPS, DAILYOPS_FLAG_BUS);
+  DAILYOPS.pertainsToDate = m_DailyOpsDateYYYYMMDD;
+  DAILYOPS.recordFlags = DAILYOPS_FLAG_BLOCKDROP;
+  DAILYOPS.DOPS.Bus.TRIPSrecordID = m_BusAssignmentInfo[m_SelectedTBAIndex].RGRPRecordID;
+  DAILYOPS.DOPS.Bus.RGRPROUTESrecordID = m_BusAssignmentInfo[m_SelectedTBAIndex].RGRPRecordID;
+  DAILYOPS.DOPS.Bus.SGRPSERVICESrecordID = m_BusAssignmentInfo[m_SelectedTBAIndex].SGRPRecordID;
+  rcode2 = btrieve(B_INSERT, TMS_DAILYOPS, &DAILYOPS, &DAILYOPSKey0, 0);
+
+
+"Undrop" a block
+================
+  
+  DailyOpsBuildRecord(&DAILYOPS, DAILYOPS_FLAG_BUS);
+  DAILYOPS.pertainsToDate = m_DailyOpsDateYYYYMMDD;
+  DAILYOPS.recordFlags = DAILYOPS_FLAG_BLOCKUNDROP;
+  DAILYOPS.DAILYOPSrecordID = GetBusAssignedRecord(m_SelectedASSIndex, TRUE);
+  rcode2 = btrieve(B_INSERT, TMS_DAILYOPS, &DAILYOPS, &DAILYOPSKey0, 0);
+
+
+Put a bus into service
+======================
+
+  DailyOpsBuildRecord(&DAILYOPS, DAILYOPS_FLAG_BUS);
+  DAILYOPS.pertainsToDate = m_DailyOpsDateYYYYMMDD;
+  DAILYOPS.recordFlags = DAILYOPS_FLAG_BUSMARKEDINSERVICE;
+  DAILYOPS.DOPS.Bus.BUSESrecordID = m_pPEGBOARD[m_SelectedBusIndex].BUSESrecordID;
+  rcode2 = btrieve(B_INSERT, TMS_DAILYOPS, &DAILYOPS, &DAILYOPSKey0, 0);
+
+
+Swap a bus and optionally put it out of service
+===============================================
+
+  DailyOpsBuildRecord(&DAILYOPS, DAILYOPS_FLAG_BUS);
+  DAILYOPS.recordFlags = DAILYOPS_FLAG_BUSSWAP;
+  DAILYOPS.pertainsToDate = m_DailyOpsDateYYYYMMDD;
+  DAILYOPS.pertainsToTime = NO_TIME;
+  if(bOutOfService)
+  {
+    DAILYOPS.recordFlags |= DAILYOPS_FLAG_BUSMARKEDOUTOFSERVICE;
+  }
+  DAILYOPS.DAILYOPSrecordID = GetBusAssignedRecord(m_SelectedASSIndex, TRUE);
+  DAILYOPS.DRIVERSrecordID = NO_RECORD;
+  DAILYOPS.DOPS.Bus.swapReasonIndex = (char)reasonIndex;
+  rcode2 = btrieve(B_INSERT, TMS_DAILYOPS, &DAILYOPS, &DAILYOPSKey0, 0);
+
+
+Register a "Clear all" bus assignments selection
+================================================
+
+  DailyOpsBuildRecord(&DAILYOPS, DAILYOPS_FLAG_BUS);
+  DAILYOPS.pertainsToDate = m_DailyOpsDateYYYYMMDD;
+  DAILYOPS.recordFlags = DAILYOPS_FLAG_BUSCLEARALL;
+  rcode2 = btrieve(B_INSERT, TMS_DAILYOPS, &DAILYOPS, &DAILYOPSKey0, 0);
+
+
+Get the most recent bus assignment record for a particular day
+==============================================================
+
+  DAILYOPSrecordID = NO_RECORD;
+  DAILYOPSKey1.recordTypeFlag = DAILYOPS_FLAG_BUS;
+  DAILYOPSKey1.pertainsToDate = m_DailyOpsDateYYYYMMDD;
+  DAILYOPSKey1.pertainsToTime = 86340L; // 1159P;
+  DAILYOPSKey1.recordFlags = 0;
+  rcode2 = btrieve(B_GETLESSTHANOREQUAL, TMS_DAILYOPS, &DAILYOPS, &DAILYOPSKey1, 1);
+  while(rcode2 == 0 &&
+        (DAILYOPS.recordTypeFlag & DAILYOPS_FLAG_BUS) &&
+        (DAILYOPS.pertainsToDate == m_DailyOpsDateYYYYMMDD))
+  {
+    if(DAILYOPS.DOPS.Bus.BUSESrecordID == m_BusAssignmentInfo[index].BUSESrecordID)
+    {
+      DAILYOPSrecordID = DAILYOPS.recordID;
+      break;
+    }
+    rcode2 = btrieve(B_GETPREVIOUS, TMS_DAILYOPS, &DAILYOPS, &DAILYOPSKey1, 1);
+  }
+
+
+Determine the status of a bus on a given day
+============================================
+
+  bAssigned = FALSE;
+  bDropped = FALSE;
+  bReturned = FALSE;
+  DAILYOPSKey1.recordTypeFlag = DAILYOPS_FLAG_BUS;
+  DAILYOPSKey1.pertainsToDate = m_DailyOpsDateYYYYMMDD;
+  DAILYOPSKey1.pertainsToTime = NO_TIME;
+  DAILYOPSKey1.recordFlags = 0;
+  BUSESrecordID = NO_RECORD;
+  rcode2 = btrieve(B_GETGREATER, TMS_DAILYOPS, &DAILYOPS, &DAILYOPSKey1, 1);
+  while(rcode2 == 0 &&
+        (DAILYOPS.recordFlags & DAILYOPS_FLAG_BUS) &&
+        (DAILYOPS.pertainsToDate == m_DailyOpsDateYYYYMMDD))
+  {
+    if((DAILYOPS.recordFlags & DAILYOPS_FLAG_BUSASSIGNMENT) ||
+          (DAILYOPS.recordFlags & DAILYOPS_FLAG_BLOCKDROP))
+    {
+      if(DAILYOPS.DOPS.Bus.TRIPSrecordID == m_BusAssignmentInfo[nI].TRIPSrecordID)
+      {
+        DAILYOPSrecordID = DAILYOPS.recordID;
+        BUSESrecordID = DAILYOPS.DOPS.Bus.BUSESrecordID;
+        bAssigned = TRUE;
+        break;
+      }
+    }
+    rcode2 = btrieve(B_GETNEXT, TMS_DAILYOPS, &DAILYOPS, &DAILYOPSKey1, 1);
+  }
+//
+//  Look for a clear all
+//
+  if(bAssigned)
+  {
+    bDropped = (DAILYOPS.recordFlags & DAILYOPS_FLAG_BLOCKDROP);
+  }
+  if(bAssigned || bDropped)
+  {
+    DAILYOPSKey0.recordID = DAILYOPSrecordID;
+    rcode2 = btrieve(B_GETEQUAL, TMS_DAILYOPS, &DAILYOPS, &DAILYOPSKey0, 0);
+    rcode2 = btrieve(B_GETPOSITION, TMS_DAILYOPS, &DAILYOPS, &DAILYOPSKey0, 0);
+    rcode2 = btrieve(B_GETDIRECT, TMS_DAILYOPS, &DAILYOPS, &DAILYOPSKey1, 1);
+    rcode2 = btrieve(B_GETNEXT, TMS_DAILYOPS, &DAILYOPS, &DAILYOPSKey1, 1);
+    bAssigned = TRUE;
+    while(rcode2 == 0 &&
+          (DAILYOPS.recordTypeFlag & DAILYOPS_FLAG_BUS) &&
+          (DAILYOPS.pertainsToDate == m_DailyOpsDateYYYYMMDD))
+    {
+      if(DAILYOPS.recordFlags & DAILYOPS_FLAG_BUSCLEARALL)
+      {
+        bAssigned = FALSE;
+        bDropped = FALSE;
+        break;
+      }
+      rcode2 = btrieve(B_GETNEXT, TMS_DAILYOPS, &DAILYOPS, &DAILYOPSKey1, 1);
+    }
+    if(bAssigned || bDropped)  // Re-establish position
+    {
+      DAILYOPSKey0.recordID = DAILYOPSrecordID;
+      rcode2 = btrieve(B_GETEQUAL, TMS_DAILYOPS, &DAILYOPS, &DAILYOPSKey0, 0);
+    }
+  }
+//
+//  Look for an undrop
+//
+  if(bDropped)
+  {
+    DAILYOPSKey0.recordID = DAILYOPSrecordID;
+    rcode2 = btrieve(B_GETEQUAL, TMS_DAILYOPS, &DAILYOPS, &DAILYOPSKey0, 0);
+    rcode2 = btrieve(B_GETPOSITION, TMS_DAILYOPS, &DAILYOPS, &DAILYOPSKey0, 0);
+    rcode2 = btrieve(B_GETDIRECT, TMS_DAILYOPS, &DAILYOPS, &DAILYOPSKey1, 1);
+    rcode2 = btrieve(B_GETNEXT, TMS_DAILYOPS, &DAILYOPS, &DAILYOPSKey1, 1);
+    bAssigned = TRUE;
+    while(rcode2 == 0 &&
+          (DAILYOPS.recordTypeFlag & DAILYOPS_FLAG_BUS) &&
+          (DAILYOPS.pertainsToDate == m_DailyOpsDateYYYYMMDD))
+    {
+      if((DAILYOPS.recordFlags & DAILYOPS_FLAG_BLOCKUNDROP) &&
+            DAILYOPS.DAILYOPSrecordID == DAILYOPSrecordID)
+      { 
+        bDropped = FALSE;
+        break;
+      }
+      rcode2 = btrieve(B_GETNEXT, TMS_DAILYOPS, &DAILYOPS, &DAILYOPSKey1, 1);
+    }
+    if(bDropped)  // Re-establish position
+    {
+      DAILYOPSKey0.recordID = DAILYOPSrecordID;
+      rcode2 = btrieve(B_GETEQUAL, TMS_DAILYOPS, &DAILYOPS, &DAILYOPSKey0, 0);
+    }
+  }
+//
+//  Look for a return
+//
+  if(bAssigned)
+  {
+    DAILYOPSKey0.recordID = DAILYOPSrecordID;
+    rcode2 = btrieve(B_GETEQUAL, TMS_DAILYOPS, &DAILYOPS, &DAILYOPSKey0, 0);
+    rcode2 = btrieve(B_GETPOSITION, TMS_DAILYOPS, &DAILYOPS, &DAILYOPSKey0, 0);
+    rcode2 = btrieve(B_GETDIRECT, TMS_DAILYOPS, &DAILYOPS, &DAILYOPSKey1, 1);
+    rcode2 = btrieve(B_GETNEXT, TMS_DAILYOPS, &DAILYOPS, &DAILYOPSKey1, 1);
+    bAssigned = TRUE;
+    while(rcode2 == 0 &&
+          (DAILYOPS.recordTypeFlag & DAILYOPS_FLAG_BUS) &&
+          (DAILYOPS.pertainsToDate == m_DailyOpsDateYYYYMMDD))
+    {
+      if((DAILYOPS.recordFlags & DAILYOPS_FLAG_BUSRETURN))
+      {
+        if(DAILYOPS.DOPS.Bus.TRIPSrecordID == m_BusAssignmentInfo[nI].TRIPSrecordID)
+        { 
+          bReturned = TRUE;
+          break;
+        }
+      }
+      rcode2 = btrieve(B_GETNEXT, TMS_DAILYOPS, &DAILYOPS, &DAILYOPSKey1, 1);
+    }
+    if(bReturned || bAssigned) // Re-establish position
+    {
+      DAILYOPSKey0.recordID = DAILYOPSrecordID;
+      rcode2 = btrieve(B_GETEQUAL, TMS_DAILYOPS, &DAILYOPS, &DAILYOPSKey0, 0);
+    }
+  }
+//
+//  Look for a bus deletion or a bus marked out of service
+//
+  if(bAssigned || bDropped)
+  {
+    DAILYOPSKey0.recordID = DAILYOPSrecordID;
+    rcode2 = btrieve(B_GETEQUAL, TMS_DAILYOPS, &DAILYOPS, &DAILYOPSKey0, 0);
+    rcode2 = btrieve(B_GETPOSITION, TMS_DAILYOPS, &DAILYOPS, &DAILYOPSKey0, 0);
+    rcode2 = btrieve(B_GETDIRECT, TMS_DAILYOPS, &DAILYOPS, &DAILYOPSKey1, 1);
+    rcode2 = btrieve(B_GETNEXT, TMS_DAILYOPS, &DAILYOPS, &DAILYOPSKey1, 1);
+    bAssigned = TRUE;
+    while(rcode2 == 0 &&
+          (DAILYOPS.recordTypeFlag & DAILYOPS_FLAG_BUS) &&
+          (DAILYOPS.pertainsToDate == m_DailyOpsDateYYYYMMDD))
+    {
+      if((DAILYOPS.recordFlags & DAILYOPS_FLAG_BUSDELETEDFROMTABLE) ||
+            (DAILYOPS.recordFlags & DAILYOPS_FLAG_BUSMARKEDOUTOFSERVICE))
+      {
+        if(DAILYOPS.DOPS.Bus.TRIPSrecordID == m_BusAssignmentInfo[nI].TRIPSrecordID)
+        { 
+          bAssigned = FALSE;
+          bDropped = FALSE;
+          break;
+        }
+      }
+      rcode2 = btrieve(B_GETNEXT, TMS_DAILYOPS, &DAILYOPS, &DAILYOPSKey1, 1);
+    }
+    if(bAssigned || bDropped || bReturned) // Re-establish position
+    {
+      DAILYOPSKey0.recordID = DAILYOPSrecordID;
+      rcode2 = btrieve(B_GETEQUAL, TMS_DAILYOPS, &DAILYOPS, &DAILYOPSKey0, 0);
+    }
+  }
+
+
+Add a bus assignment to the audit trail in case it missed being registered (this should never happen)
+==========================================================================
+
+  DailyOpsBuildRecord(&DAILYOPS, DAILYOPS_FLAG_BUS);
+  DAILYOPS.recordFlags = DAILYOPS_FLAG_BUSASSIGNMENT | DAILYOPS_FLAG_BUSMISSEDASSIGNMENT;
+  DAILYOPS.pertainsToDate = m_DailyOpsDateYYYYMMDD;
+  DAILYOPS.DOPS.Bus.BUSESrecordID = m_BusAssignmentInfo[index].BUSESrecordID;
+  rcode2 = btrieve(B_INSERT, TMS_DAILYOPS, &DAILYOPS, &DAILYOPSKey0, 0);
+
+
+See if an operator is "checked-in" or "checked-out"
+===================================================
+
+  DAILYOPSKey3.DRIVERSrecordID = DRIVERSrecordID;
+  DAILYOPSKey3.recordTypeFlag = DAILYOPS_FLAG_OPERATOR;
+  DAILYOPSKey3.pertainsToDate = m_DailyOpsDateYYYYMMDD;
+  DAILYOPSKey3.pertainsToTime = 86340L; // 1159P
+  DAILYOPSKey3.recordFlags = 0;
+  recordFlag = 0;
+  rcode2 = btrieve(B_GETLESSTHANOREQUAL, TMS_DAILYOPS, &DAILYOPS, &DAILYOPSKey3, 3);
+  while(rcode2 == 0 &&
+        (DAILYOPS.DRIVERSrecordID == DRIVERSrecordID) &&
+        (DAILYOPS.recordTypeFlag & DAILYOPS_FLAG_OPERATOR))
+  {
+    if((DAILYOPS.recordFlags & DAILYOPS_FLAG_OPERATORCHECKIN) ||
+          (DAILYOPS.recordFlags & DAILYOPS_FLAG_OPERATORCHECKOUT))
+    {
+      btrieve(B_GETPOSITION, TMS_DAILYOPS, &absRecID, &DAILYOPSKey3, 3);  // Look for an error correction on the check-in/out
+      DAILYOPSKey2.DAILYOPSrecordID = DAILYOPS.recordID;
+      bFound = (btrieve(B_GETEQUAL, TMS_DAILYOPS, &DAILYOPS, &DAILYOPSKey2, 2) == 0);
+      if(!bFound)
+      {
+        recordFlag = DAILYOPS.recordFlags;
+        break;
+      }
+      DAILYOPS.recordID = absRecID;
+      btrieve(B_GETDIRECT, TMS_DAILYOPS, &DAILYOPS, &DAILYOPSKey3, 3);
+    }
+    rcode2 = btrieve(B_GETPREVIOUS, TMS_DAILYOPS, &DAILYOPS, &DAILYOPSKey3, 3);
+  }
+
+
+Check in or check out a driver
+==============================
+
+  bCheckingIn = TRUE;
+  DAILYOPSKey3.DRIVERSrecordID = DRIVERSrecordID;
+  DAILYOPSKey3.recordTypeFlag = DAILYOPS_FLAG_OPERATOR;
+  DAILYOPSKey3.pertainsToDate = m_DailyOpsDateYYYYMMDD;
+  DAILYOPSKey3.pertainsToTime = 86340L; // 1159P
+  DAILYOPSKey3.recordFlags = 0;
+  bOKToRecord = FALSE;
+  rcode2 = btrieve(B_GETLESSTHANOREQUAL, TMS_DAILYOPS, &DAILYOPS, &DAILYOPSKey3, 3);
+  while(rcode2 == 0 &&
+        (DAILYOPS.DRIVERSrecordID == DRIVERSrecordID) &&
+        (DAILYOPS.recordTypeFlag & DAILYOPS_FLAG_OPERATOR))
+  {
+    if((DAILYOPS.recordFlags & DAILYOPS_FLAG_OPERATORCHECKIN) ||
+          (DAILYOPS.recordFlags & DAILYOPS_FLAG_OPERATORCHECKOUT))
+    {
+      btrieve(B_GETPOSITION, TMS_DAILYOPS, &absRecID, &DAILYOPSKey3, 3);  // Look for an error correction on the check-in/out
+      DAILYOPSKey2.DAILYOPSrecordID = DAILYOPS.recordID;
+      bFound = (btrieve(B_GETEQUAL, TMS_DAILYOPS, &DAILYOPS, &DAILYOPSKey2, 2) == 0);
+      if(!bFound)
+      {
+        if(bCheckingIn)
+        {
+          if(DAILYOPS.recordFlags & DAILYOPS_FLAG_OPERATORCHECKOUT)
+          {
+            bOKToRecord = TRUE;
+          }
+        }
+        else
+        {
+          if(DAILYOPS.recordFlags & DAILYOPS_FLAG_OPERATORCHECKIN)
+          {
+            bOKToRecord = TRUE;
+          }
+        }
+        break;
+      }
+      DAILYOPS.recordID = absRecID;
+      btrieve(B_GETDIRECT, TMS_DAILYOPS, &DAILYOPS, &DAILYOPSKey3, 3);
+    }
+    rcode2 = btrieve(B_GETPREVIOUS, TMS_DAILYOPS, &DAILYOPS, &DAILYOPSKey3, 3);
+  }
+  if(bOKToRecord)
+  {
+    DailyOpsBuildRecord(&DAILYOPS, DAILYOPS_FLAG_OPERATOR);
+    DAILYOPS.pertainsToDate = m_DailyOpsDateYYYYMMDD;
+    DAILYOPS.pertainsToTime = m_DailyOpsDate.GetHour() * 3600 + m_DailyOpsDate.GetMinute() * 60 + m_DailyOpsDate.GetSecond();
+    DAILYOPS.DRIVERSrecordID = DRIVERSrecordID;
+    DAILYOPS.DAILYOPSrecordID = NO_RECORD;
+    DAILYOPS.recordFlags = (bCheckingIn ? DAILYOPS_FLAG_OPERATORCHECKIN : DAILYOPS_FLAG_OPERATORCHECKOUT);
+    rcode2 = btrieve(B_INSERT, TMS_DAILYOPS, &DAILYOPS, &DAILYOPSKey0, 0);
+  }
+
+
+Check out a driver
+==================
+
+  bCheckingIn = FALSE;
+  
+  Then use the check-in routine
+
+
+Give a driver extra time
+========================
+
+  DailyOpsBuildRecord(&DAILYOPS, DAILYOPS_FLAG_OPERATOR);
+  DAILYOPS.pertainsToDate = m_DailyOpsDateYYYYMMDD;
+  DAILYOPS.pertainsToTime = m_DailyOpsDate.GetHour() * 3600 + m_DailyOpsDate.GetMinute() * 60 + m_DailyOpsDate.GetSecond();
+  DAILYOPS.recordFlags = DAILYOPS_FLAG_OVERTIME;
+  DAILYOPS.DRIVERSrecordID = DRIVERSrecordID;
+  DAILYOPS.DOPS.Operator.timeAdjustment = extraTime;
+  rcode2 = btrieve(B_INSERT, TMS_DAILYOPS, &DAILYOPS, &DAILYOPSKey0, 0);
+
+
+Give a driver an extra trip
+===========================
+
+  DailyOpsBuildRecord(&DAILYOPS, DAILYOPS_FLAG_OPERATOR);
+  DAILYOPS.pertainsToDate = m_DailyOpsDateYYYYMMDD;
+  DAILYOPS.pertainsToTime = m_DailyOpsDate.GetHour() * 3600 + m_DailyOpsDate.GetMinute() * 60 + m_DailyOpsDate.GetSecond();
+  DAILYOPS.recordFlags = DAILYOPS_FLAG_EXTRATRIP;
+  DAILYOPS.DAILYOPSrecordID = NO_RECORD;
+  DAILYOPS.DRIVERSrecordID = DRIVERSrecordID;
+  DAILYOPS.DOPS.Operator.ROUTESrecordID = m_ROUTESrecordID;
+  DAILYOPS.DOPS.Operator.SERVICESrecordID = m_SERVICESrecordID;
+  DAILYOPS.DOPS.Operator.PATTERNNAMESrecordID = m_PATTERNNAMESrecordID;
+  DAILYOPS.DOPS.Operator.directionIndex = m_directionIndex;
+  DAILYOPS.DOPS.Operator.timeAtMLP = timeAtMLP;
+  DAILYOPS.DOPS.Operator.deadheadTime = deadheadTime;
+  DAILYOPS.DOPS.Operator.timeAdjustment = totalTime;
+  rcode2 = btrieve(B_INSERT, TMS_DAILYOPS, &DAILYOPS, &DAILYOPSKey0, 0);
+
+
+
+Error correction - reverse an entry pertaining to a driver
+==========================================================
+
+Note: This applies across the board to check-in/out,
+      extra time, extra trip, BUT NOT ABSENCES
+  
+  rcode2 = btrieve(B_GETLAST, TMS_DAILYOPS, &DAILYOPS, &DAILYOPSKey0, 0);
+  DAILYOPS.recordID = AssignRecID(rcode2, DAILYOPS.recordID);
+  DAILYOPS.entryDateAndTime = time.GetTime();
+  DAILYOPS.pertainsToDate = NO_RECORD;
+  DAILYOPS.pertainsToTime = NO_TIME;
+  DAILYOPS.recordTypeFlag = (char)m_flags;
+  DAILYOPS.userID = m_UserID;
+  DAILYOPS.DRIVERSrecordID = NO_RECORD;;
+  DAILYOPS.DAILYOPSrecordID = DAILYOPSrecordID;
+  memset(DAILYOPS.DOPS.associatedData, 0x00, DAILYOPS_ASSOCIATEDDATA_LENGTH);
+  DAILYOPS.recordFlags = DAILYOPS_FLAG_OPERATORUNCHECK;
+  rcode2 = btrieve(B_INSERT, TMS_DAILYOPS, &DAILYOPS, &DAILYOPSKey0, 0);
+
+
+Build a list of who isn't here today (including partial absences)
+=================================================================
+
+  DAILYOPSKey1.recordTypeFlag = DAILYOPS_FLAG_ABSENCE;
+  DAILYOPSKey1.pertainsToDate = m_DailyOpsDateYYYYMMDD - 10000;  // Go back a year
+  DAILYOPSKey1.pertainsToTime = 0;
+  DAILYOPSKey1.recordFlags = 0;
+  rcode2 = btrieve(B_GETGREATEROREQUAL, TMS_DAILYOPS, &DAILYOPS, &DAILYOPSKey1, 1);
+  while(rcode2 == 0 &&
+        (DAILYOPS.recordTypeFlag & DAILYOPS_FLAG_ABSENCE) &&
+         DAILYOPS.pertainsToDate <= m_DailyOpsDateYYYYMMDD)
+  {
+    if(m_DailyOpsDateYYYYMMDD >= DAILYOPS.pertainsToDate &&
+          m_DailyOpsDateYYYYMMDD <= DAILYOPS.DOPS.Absence.untilDate &&
+          (DAILYOPS.recordFlags & DAILYOPS_FLAG_ABSENCEREGISTER))
+    {
+      DAILYOPSrecordID = DAILYOPS.recordID;
+      btrieve(B_GETPOSITION, TMS_DAILYOPS, &absRecID, &DAILYOPSKey1, 1);
+      DAILYOPSKey2.DAILYOPSrecordID = DAILYOPS.recordID;
+      bFound = (btrieve(B_GETEQUAL, TMS_DAILYOPS, &DAILYOPS, &DAILYOPSKey2, 2) == 0);
+      DAILYOPS.recordID = absRecID;
+      btrieve(B_GETDIRECT, TMS_DAILYOPS, &DAILYOPS, &DAILYOPSKey1, 1);
+      if(!bFound)
+      {
+      }
+    }
+    rcode2 = btrieve(B_GETNEXT, TMS_DAILYOPS, &DAILYOPS, &DAILYOPSKey1, 1);
+  }
+
+
+Check the audit trail for any assignments that have been made for today
+=======================================================================
+
+  DAILYOPSKey1.recordTypeFlag = DAILYOPS_FLAG_OPENWORK;
+  DAILYOPSKey1.pertainsToDate = m_DailyOpsDateYYYYMMDD;
+  DAILYOPSKey1.pertainsToTime = NO_TIME;
+  DAILYOPSKey1.recordFlags = 0;
+  rcode2 = btrieve(B_GETGREATER, TMS_DAILYOPS, &DAILYOPS, &DAILYOPSKey1, 1);
+  while(rcode2 == 0 &&
+        (DAILYOPS.recordTypeFlag & DAILYOPS_FLAG_OPENWORK) &&
+         DAILYOPS.pertainsToDate == m_DailyOpsDateYYYYMMDD)
+  {
+    for(nI = 0; nI < m_numInOpenWork; nI++)  //  Find the run in the list
+    {
+      if(DAILYOPS.DOPS.OpenWork.RUNSrecordID == m_OpenWork[nI].RUNSrecordID)
+      {
+        if(DAILYOPS.recordFlags & DAILYOPS_FLAG_OPENWORKASSIGN)  //  Assign
+        {
+          if(bDisplay)
+          {
+            pListCtrlOPENWORKLIST->SetItemText(nI, 8, BuildOperatorString(DAILYOPS.DRIVERSrecordID));
+          }
+          m_OpenWork[nI].DRIVERSrecordID = DAILYOPS.DRIVERSrecordID;
+          m_OpenWork[nI].flags = OPENWORK_ASSIGNEDTODAY;
+        }
+        else if(DAILYOPS.recordFlags & DAILYOPS_FLAG_OPENWORKCLEAR)  //  Clear
+        {
+          if(bDisplay)
+          {
+            pListCtrlOPENWORKLIST->SetItemText(nI, 8, "");
+          }
+          m_OpenWork[nI].DRIVERSrecordID = NO_RECORD;
+          m_OpenWork[nI].flags = 0;
+        }
+        break;
+      }
+    }
+    rcode2 = btrieve(B_GETNEXT, TMS_DAILYOPS, &DAILYOPS, &DAILYOPSKey1, 1);             
+  }
+
+
+Assign a driver to a run in the Open Work Monitor
+=================================================
+      
+  DailyOpsBuildRecord(&DAILYOPS, DAILYOPS_FLAG_OPENWORK);
+  DAILYOPS.pertainsToDate = m_DailyOpsDateYYYYMMDD;
+  DAILYOPS.pertainsToTime = NO_TIME;
+  DAILYOPS.recordFlags = DAILYOPS_FLAG_OPENWORKASSIGN;
+  DAILYOPS.DRIVERSrecordID = DRIVERSrecordID;
+  DAILYOPS.DAILYOPSrecordID = NO_RECORD;
+  DAILYOPS.DOPS.OpenWork.RUNSrecordID = pListCtrlOPENWORKLIST->GetItemData(m_SelectedOWRow);
+  rcode2 = btrieve(B_INSERT, TMS_DAILYOPS, &DAILYOPS, &DAILYOPSKey0, 0);
+
+
+Clear a driver from the Open Work Monitor
+=========================================
+
+  DailyOpsBuildRecord(&DAILYOPS, DAILYOPS_FLAG_OPENWORK);
+  DAILYOPS.pertainsToDate = m_DailyOpsDateYYYYMMDD;
+  DAILYOPS.pertainsToTime = NO_TIME;
+  DAILYOPS.recordFlags = DAILYOPS_FLAG_OPENWORKCLEAR;
+  DAILYOPS.DRIVERSrecordID = m_OpenWork[m_SelectedOWRow].DRIVERSrecordID;
+  DAILYOPS.DAILYOPSrecordID = NO_RECORD;
+  DAILYOPS.DOPS.OpenWork.RUNSrecordID = pListCtrlOPENWORKLIST->GetItemData(m_SelectedOWRow);
+  rcode2 = btrieve(B_INSERT, TMS_DAILYOPS, &DAILYOPS, &DAILYOPSKey0, 0);
+
+
+Build a list of who isn't here today (including partial absences)
+=================================================================
+
+  DAILYOPSKey1.recordTypeFlag = DAILYOPS_FLAG_ABSENCE;
+  DAILYOPSKey1.pertainsToDate = m_DailyOpsDateYYYYMMDD - 10000;  // Go back a year
+  DAILYOPSKey1.pertainsToTime = 0;
+  DAILYOPSKey1.recordFlags = 0;
+  rcode2 = btrieve(B_GETGREATEROREQUAL, TMS_DAILYOPS, &DAILYOPS, &DAILYOPSKey1, 1);
+  while(rcode2 == 0 &&
+        (DAILYOPS.recordTypeFlag & DAILYOPS_FLAG_ABSENCE) &&
+         DAILYOPS.pertainsToDate <= m_DailyOpsDateYYYYMMDD)
+  {
+    if(m_DailyOpsDateYYYYMMDD >= DAILYOPS.pertainsToDate &&
+          m_DailyOpsDateYYYYMMDD <= DAILYOPS.DOPS.Absence.untilDate &&
+          (DAILYOPS.recordFlags & DAILYOPS_FLAG_ABSENCEREGISTER))
+    {
+      DAILYOPSrecordID = DAILYOPS.recordID;
+      btrieve(B_GETPOSITION, TMS_DAILYOPS, &absRecID, &DAILYOPSKey1, 1);
+      DAILYOPSKey2.DAILYOPSrecordID = DAILYOPS.recordID;
+      bFound = (btrieve(B_GETEQUAL, TMS_DAILYOPS, &DAILYOPS, &DAILYOPSKey2, 2) == 0);
+      DAILYOPS.recordID = absRecID;
+      btrieve(B_GETDIRECT, TMS_DAILYOPS, &DAILYOPS, &DAILYOPSKey1, 1);
+      if(!bFound)
+      {
+      }
+    }
+    rcode2 = btrieve(B_GETNEXT, TMS_DAILYOPS, &DAILYOPS, &DAILYOPSKey1, 1);
+  }
+
+
+Unregister a previous absence
+=============================
+
+  CTime time = CTime::GetCurrentTime();
+  rcode2 = btrieve(B_GETLAST, TMS_DAILYOPS, &DAILYOPS, &DAILYOPSKey0, 0);
+  DAILYOPS.recordID = AssignRecID(rcode2, DAILYOPS.recordID);
+  DAILYOPS.entryDateAndTime = time.GetTime();
+  DAILYOPS.recordTypeFlag = DAILYOPS_FLAG_ABSENCE;
+  DAILYOPS.userID = m_UserID;
+  DAILYOPS.recordFlags = DAILYOPS_FLAG_ABSENCEUNREGISTER;
+  DAILYOPS.DRIVERSrecordID = NO_RECORD;
+  DAILYOPS.DAILYOPSrecordID = *m_pDAILYOPSrecordID;
+  memset(DAILYOPS.DOPS.associatedData, 0x00, DAILYOPS_ASSOCIATEDDATA_LENGTH);
+  rcode2 = btrieve(B_INSERT, TMS_DAILYOPS, &DAILYOPS, &DAILYOPSKey0, 0);
+
+
+Register an absence and optionally add notes
+============================================
+
+  pEditTIMEUSED->GetWindowText(tempString, TEMPSTRING_LENGTH);
+  long timeUsed = cTime(tempString);
+  int nI, reasonIndex;
+  nI = pComboBoxREASON->GetCurSel();
+  if(nI == CB_ERR)
+  {
+    return;
+  }
+  reasonIndex = pComboBoxREASON->GetItemData(nI);
+  DailyOpsBuildRecord(&DAILYOPS, DAILYOPS_FLAG_ABSENCE);
+  DAILYOPS.recordFlags = DAILYOPS_FLAG_ABSENCEREGISTER;
+  DAILYOPS.pertainsToDate = fromDate;
+  DAILYOPS.pertainsToTime = fromTime;
+  DAILYOPS.DAILYOPSrecordID = NO_RECORD;
+  DAILYOPS.DRIVERSrecordID = m_DRIVERSrecordID;
+  if(pButtonPAID->GetCheck())
+  {
+    DAILYOPS.recordFlags |= DAILYOPS_FLAG_ABSENCEPAID;
+  }
+  else if(pButtonNOTSUREIFPAID->GetCheck())
+  {
+    DAILYOPS.recordFlags |= DAILYOPS_FLAG_NOTSUREIFPAID;
+  }
+  DAILYOPS.DOPS.Absence.untilDate = toDate;
+  DAILYOPS.DOPS.Absence.untilTime = toTime;
+  DAILYOPS.DOPS.Absence.reasonIndex = reasonIndex;
+  DAILYOPS.DOPS.Absence.timeLost = timeUsed;
+  rcode2 = btrieve(B_INSERT, TMS_DAILYOPS, &DAILYOPS, &DAILYOPSKey0, 0);
+//
+//  Were there any notes?
+//
+  pEditNOTES->GetWindowText(s);
+  if(s != "")
+  {
+    rcode2 = btrieve(B_GETLAST, TMS_OFFTIME, &OFFTIME, &OFFTIMEKey0, 0);
+    OFFTIME.recordID = AssignRecID(rcode2, OFFTIME.recordID);
+    OFFTIME.DAILYOPSrecordID = DAILYOPS.recordID;
+    strcpy(tempString, s);
+    pad(tempString, OFFTIME_TEXT_LENGTH);
+    strncpy(OFFTIME.text, tempString, OFFTIME_TEXT_LENGTH);
+    rcode2 = btrieve(B_INSERT, TMS_OFFTIME, &OFFTIME, &OFFTIMEKey0, 0);
+  }
