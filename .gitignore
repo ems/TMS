@@ -4,8 +4,6 @@
 *.bsc
 *.chm
 *.dll
-*.dsp
-*.dsw
 *.exe
 *.hlp
 *.idb
