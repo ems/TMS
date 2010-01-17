@@ -11,6 +11,7 @@
 *.dsk
 *.DPbcd
 *.exe
+*.EXE
 *.hlp
 *.idb
 *.idl
