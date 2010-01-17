@@ -35,6 +35,7 @@
 *.res
 *.rtf
 *.save
+*.sbr
 *.suo
 *.tlh
 *.tli
