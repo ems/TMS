@@ -104,17 +104,15 @@ cron_t   PieceCoster( Piece rgPiece[], int numPieces )
     {
         int i = LOWORD( runType );
         int j = HIWORD( runType );
-        goodRunType = (CUTPARMS.runtypes[i][j]) &&
-              (RUNTYPE[i][j].flags & RTFLAGS_INUSE);
+        goodRunType = (CUTPARMS.runtypes[i][j]) && (RUNTYPE[i][j].flags & RTFLAGS_INUSE);
     }
     else
-        goodRunType = runType == grcp->runType;
+        goodRunType = (runType == grcp->runType);
 
     if( !goodRunType )
     {
         TM(  1, "PieceCoster: runCoster returns incompatible run type.\n");
-        TM2( 1, "             (wanted %ld, got %ld)\n",
-              grcp->runType, runType );
+        TM2( 1, "             (wanted %ld, got %ld)\n", grcp->runType, runType );
         return InfiniteCost;
     }
 

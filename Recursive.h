@@ -347,7 +347,7 @@ struct TimeBlock
 	TimeBlock( const tod_t aT, const long aBlock ) : t(aT), block(aBlock) {}
 	TimeBlock( const Ref<RPiece> &p ) : t(p->startTime()), block(p->blockNumber()) {}
 	bool	operator<( const TimeBlock &tb ) const
-	{ return t < tb.t ? 1 : tb.t < t ? 0 : block < tb.block; }
+	{ return t < tb.t ? true : tb.t < t ? false : block < tb.block; }
 	tod_t	t;
 	long	block;
 };

@@ -13,14 +13,8 @@ static time_t logStartTime;
 
 static void initLog(void)
 {
-    OFSTRUCT ofStruct;
-    HFILE hFile;
-
-    // Clean up the old log file.
-    hFile = OpenFile(logFile, &ofStruct, OF_CREATE | OF_WRITE);
-    if(hFile == HFILE_ERROR)
-        return;
-    _lclose(hFile);
+	FILE	*pf = fopen( logFile, "w" );
+	fclose( pf );
 
     msgCount = 0L;
     logStartTime = time(NULL);
@@ -29,28 +23,13 @@ static void initLog(void)
 char    szLogTmp[2048];
 int logMsg( char *sz )
 {
-    static HFILE hFile = HFILE_ERROR;
-    char   szTmp[2048];
+	FILE	*pf = fopen( logFile, "a" );
+	if( !pf )
+		return 0;
 
-    if( hFile == HFILE_ERROR )
-        initLog();
-
-    // Open the log file again.
-    hFile = _lopen(logFile, WRITE);
-    if(hFile == HFILE_ERROR)
-        return 0;
-
-    // Seek to the end of the file.
-    _llseek( hFile, 0L, 2 );
-
-    // Get the current date and time
-    sprintf( szTmp, "%ld\t%ld\t%s%s", ++msgCount,
-                        time(NULL) - logStartTime, sz,
+	fprintf( pf, "%ld\t%ld\t%s%s", ++msgCount, time(NULL) - logStartTime, sz,
                         sz[strlen(sz)-1] == '\n' ? "" : "\n");
-    _lwrite( hFile, szTmp, strlen(szTmp) );
-
-    // Close the file so we don't lose the entry.
-    _lclose(hFile);
+	fclose( pf );
     return 1;
 }
 #endif
@@ -585,6 +564,9 @@ static void ReinitializeLeftoverPieces(void)
 	// to ensure the end up in the correct order.
 	while( (piece = invalidPieceList) != NULL )
 	{
+		Assert( piece->segmentStart->block == piece->segmentEnd->block );
+		Assert( piece->segmentStart->start < piece->segmentEnd->end );
+
 		while( piece->next != NULL &&
 				piece->segmentEnd->block	== piece->next->segmentStart->block &&
 				piece->segmentEnd->end		== piece->next->segmentStart->start )
@@ -592,6 +574,9 @@ static void ReinitializeLeftoverPieces(void)
 			piece->segmentEnd = piece->next->segmentEnd;
 			PieceRemove( piece->next );
 		}
+
+		Assert( piece->segmentStart->block == piece->segmentEnd->block );
+		Assert( piece->segmentStart->start < piece->segmentEnd->end );
 
         ChangePieceStatus( piece, Valid );
 	}
@@ -639,34 +624,34 @@ RunCutLookaheadParameters		  *lrcp = &runCutLookaheadParameters;
 
 static void InitRunCutParameters(void)
 {
-  grcp->fSmartLookahead 		= TRUE;
-	grcp->fTwoPieceCanBeOne	= FALSE;
-
+	grcp->fSmartLookahead 		= TRUE;
+	grcp->fTwoPieceCanBeOne		= FALSE;
+	
 	grcp->platformTimeTarget  = Hour(8);
 	grcp->platformTimeMin     = Hour(6)+Minute(30);
 	grcp->platformTimeMax     = Hour(9)+Minute(30);
-
+	
 	grcp->unmatchedPieceCost  = Hour(10);
-
+	
 	grcp->minLeftover         = Hour(1);
-
+	
 	grcp->minPieceSize        = Hour(1);
 	grcp->desPieceSize        = Hour(8);
 	grcp->maxPieceSize        = Hour(10);
-
+	
 	grcp->minPieceSize1 = grcp->minPieceSize2 = Hour(3);
 	grcp->desPieceSize1 = grcp->desPieceSize2 = Hour(4);
 	grcp->maxPieceSize1 = grcp->maxPieceSize2 = Hour(6);
 	grcp->maxSpread		   = Hour(48);
-
+	
 	grcp->startRunBeforeTime  = Hour(48)-Second(1);
 	grcp->endRunAfterTime     = Hour(0);
-  grcp->runType             = 0L;
-
+	grcp->runType             = 0L;
+	
     // These are set based on conditions in the particular block.
-  lrcp->minPieceSize			= grcp->minPieceSize;
-  lrcp->desPieceSize			= grcp->desPieceSize;
-  lrcp->maxPieceSize			= grcp->maxPieceSize;
+	lrcp->minPieceSize			= grcp->minPieceSize;
+	lrcp->desPieceSize			= grcp->desPieceSize;
+	lrcp->maxPieceSize			= grcp->maxPieceSize;
 }
 
 #define	ProvideDefault(x, d)	(x != NO_TIME ? x : d)
@@ -675,159 +660,164 @@ void AutomaticRunCut(short int wmId)
 {
 	extern void RecursiveRuncut(void);
 	extern void ChainsawRuncut(void);
-
+	
 	if(wmId == IDRECURSIVE)
-    RecursiveRuncut();
-  else
+		RecursiveRuncut();
+	else
 	{
-    int         i, j;
-    int         cutTwoPieceBefore = FALSE;
-    long        savings;
-
-    InitRunCutParameters();
-//
-//  Make sure memory pool and lists are initialized
-//
-    RCFreeAll();
-    InitSegments(1);
-
+		int         i, j;
+		int         cutTwoPieceBefore = FALSE;
+		long        savings;
+		
+		InitRunCutParameters();
+		//
+		//  Make sure memory pool and lists are initialized
+		//
+		RCFreeAll();
+		InitSegments(1);
+		
 #ifndef PRODUCT
-  	TM( 1, "Initial Pieces:\n" );
-	  PrintPieceList( unexaminedPieceList );
+		TM( 1, "Initial Pieces:\n" );
+		PrintPieceList( unexaminedPieceList );
 #endif
-
-    InitBlocks();
-    InitPieces();
-
-    if( CUTPARMS.cutRuns )
-      grcp->endRunAfterTime = CUTPARMS.endTime;
-    else
-      grcp->startRunBeforeTime = CUTPARMS.startTime;
-
-    grcp->fSmartLookahead = CUTPARMS.flags & CUTPARMSFLAGS_SMART;
-
-    for( i = 0; i < NUMRUNTYPES; i++ )
+		
+		InitBlocks();
+		InitPieces();
+		
+		if( CUTPARMS.cutRuns )
+			grcp->endRunAfterTime = CUTPARMS.endTime;
+		else
+			grcp->startRunBeforeTime = CUTPARMS.startTime;
+		
+		grcp->fSmartLookahead = (CUTPARMS.flags & CUTPARMSFLAGS_SMART);
+		
+		for( i = 0; i < NUMRUNTYPES; i++ )
 		{
-      for( j = 0; j < NUMRUNTYPESLOTS; j++ )
+			for( j = 0; j < NUMRUNTYPESLOTS; j++ )
 			{
-        if( (CUTPARMS.runtypes[i][j]) &&
-              (RUNTYPE[i][j].flags & RTFLAGS_INUSE))
+				if( (CUTPARMS.runtypes[i][j]) &&
+					(RUNTYPE[i][j].flags & RTFLAGS_INUSE))
 				{
-          grcp->platformTimeMin    = ProvideDefault(RUNTYPE[i][j].minPayTime, 8*60*60);
-          grcp->platformTimeTarget = ProvideDefault(RUNTYPE[i][j].desPayTime, 8*60*60);
-          grcp->platformTimeMax    = ProvideDefault(RUNTYPE[i][j].maxPayTime, 10*60*60);
-          grcp->minLeftover        = ProvideDefault(CUTPARMS.minLeftover, 60*60);
-          grcp->runType            = MAKELONG(i,j);
-				
-          switch( RUNTYPE[i][j].numPieces )
+					grcp->platformTimeMin    = ProvideDefault(RUNTYPE[i][j].minPayTime, 8*60*60);
+					grcp->platformTimeTarget = ProvideDefault(RUNTYPE[i][j].desPayTime, 8*60*60);
+					grcp->platformTimeMax    = ProvideDefault(RUNTYPE[i][j].maxPayTime, 10*60*60);
+					grcp->minLeftover        = ProvideDefault(CUTPARMS.minLeftover, 60*60);
+					grcp->runType            = MAKELONG(i,j);
+					
+					switch( RUNTYPE[i][j].numPieces )
 					{
-            case 1:
-              grcp->fTwoPieceCanBeOne = TRUE;
-              grcp->minPieceSize = ProvideDefault(RUNTYPE[i][j].PIECE[0].minPieceSize, 1*60*60);
-              grcp->desPieceSize = ProvideDefault(RUNTYPE[i][j].PIECE[0].desPieceSize, 8*60*60);
-              grcp->maxPieceSize = ProvideDefault(RUNTYPE[i][j].PIECE[0].maxPieceSize, 10*60*60);
-              grcp->maxSpread    = ProvideDefault(RUNTYPE[i][j].maxSpreadTime, 24*60*60);
-              if(grcp->desPieceSize < grcp->minPieceSize ||
-                    grcp->desPieceSize > grcp->maxPieceSize ||
-                    grcp->desPieceSize == NO_TIME)
-                grcp->desPieceSize = (grcp->minPieceSize + grcp->maxPieceSize) / 2;
-              if(i == TRIPPER_INDEX)
-                PerformTripperRunCut();
-              else if(i == ILLEGAL_INDEX)
-                PerformIllegalRunCut();
-              else
-                PerformStraightRunCut();
-              ReinitializeLeftoverPieces();
-              break;
-//
-//  Consider all possible two piece cuts simultaneosly.
-//  This means that we only need to loop throught the 2-piece
-//  run types onece.
-//
-            case 2:
-				if( cutTwoPieceBefore )
-					break;
-				cutTwoPieceBefore = TRUE;
-				//
-				//  This gets a bit tricky on what to do here since I do
-				//  not know beforehand where the piece is going to go
-				//  until after I assign it - but I need to prepare probable
-				//  pieces beforehand.  I don't know what to do about this
-				//  if the specified pieces are of different sizes.
-				//
-				grcp->minPieceSize =
-					(ProvideDefault(RUNTYPE[i][j].PIECE[0].minPieceSize, 4*60*60) +
-					ProvideDefault(RUNTYPE[i][j].PIECE[1].minPieceSize, 4*60*60)) / 2;
-				
-				if(RUNTYPE[i][j].PIECE[0].desPieceSize == NO_TIME ||
-					RUNTYPE[i][j].PIECE[1].desPieceSize == NO_TIME)
-				{
-					grcp->desPieceSize =
-						(RUNTYPE[i][j].PIECE[0].minPieceSize +
-						RUNTYPE[i][j].PIECE[0].maxPieceSize) / 2;
-				}
-				else
-				{
-					grcp->desPieceSize =
-						(RUNTYPE[i][j].PIECE[0].desPieceSize +
-						RUNTYPE[i][j].PIECE[1].desPieceSize) / 2;
-				}
-				grcp->maxPieceSize =
-					(ProvideDefault(RUNTYPE[i][j].PIECE[0].maxPieceSize, 8*60*60) +
-					ProvideDefault(RUNTYPE[i][j].PIECE[1].maxPieceSize, 8*60*60)) / 2;
-				if(grcp->desPieceSize < grcp->minPieceSize ||
-					grcp->desPieceSize > grcp->maxPieceSize ||
-                    grcp->desPieceSize == NO_TIME)
-				{
-					grcp->desPieceSize = (grcp->minPieceSize + grcp->maxPieceSize) / 2;
-				}
-				grcp->maxSpread = ProvideDefault(RUNTYPE[i][j].maxSpreadTime, 24*60*60);
-				//
-				//  Store multi-piece info.
-				//
-				grcp->desPieceSize1 = ProvideDefault(RUNTYPE[i][j].PIECE[0].desPieceSize, 4*60*60);
-				grcp->minPieceSize1 = ProvideDefault(RUNTYPE[i][j].PIECE[0].minPieceSize, 1*60*60);
-				grcp->maxPieceSize1 = ProvideDefault(RUNTYPE[i][j].PIECE[0].maxPieceSize, 8*60*60);
-				grcp->desPieceSize2 = ProvideDefault(RUNTYPE[i][j].PIECE[1].desPieceSize, 4*60*60);
-				grcp->minPieceSize2 = ProvideDefault(RUNTYPE[i][j].PIECE[1].minPieceSize, 1*60*60);
-				grcp->maxPieceSize2 = ProvideDefault(RUNTYPE[i][j].PIECE[1].maxPieceSize, 8*60*60);
-				
-				PerformTwoPieceRunCut();
-				ReinitializeLeftoverPieces();
-				PerformTwoPieceCleanup();
-				ReinitializeLeftoverPieces();
-				break;
-				
-            default:  // don't know how to cut this run type !!!
-				break;
+					case 1:
+						grcp->fTwoPieceCanBeOne = TRUE;
+						grcp->minPieceSize = ProvideDefault(RUNTYPE[i][j].PIECE[0].minPieceSize, 1*60*60);
+						grcp->desPieceSize = ProvideDefault(RUNTYPE[i][j].PIECE[0].desPieceSize, 8*60*60);
+						grcp->maxPieceSize = ProvideDefault(RUNTYPE[i][j].PIECE[0].maxPieceSize, 10*60*60);
+						grcp->maxSpread    = ProvideDefault(RUNTYPE[i][j].maxSpreadTime, 24*60*60);
+						if(grcp->desPieceSize < grcp->minPieceSize ||
+							grcp->desPieceSize > grcp->maxPieceSize ||
+							grcp->desPieceSize == NO_TIME)
+							grcp->desPieceSize = (grcp->minPieceSize + grcp->maxPieceSize) / 2;
+						if(i == TRIPPER_INDEX)
+							PerformTripperRunCut();
+						else if(i == ILLEGAL_INDEX)
+							PerformIllegalRunCut();
+						else
+							PerformStraightRunCut();
+						ReinitializeLeftoverPieces();
+						break;
+						//
+						//  Consider all possible two piece cuts simultaneosly.
+						//  This means that we only need to loop throught the 2-piece
+						//  run types onece.
+						//
+					case 2:
+						if( cutTwoPieceBefore )
+							break;
+						cutTwoPieceBefore = TRUE;
+						//
+						//  This gets a bit tricky on what to do here since I do
+						//  not know beforehand where the piece is going to go
+						//  until after I assign it - but I need to prepare probable
+						//  pieces beforehand.  I don't know what to do about this
+						//  if the specified pieces are of different sizes.
+						//
+						grcp->minPieceSize =
+							(ProvideDefault(RUNTYPE[i][j].PIECE[0].minPieceSize, 4*60*60) +
+							ProvideDefault(RUNTYPE[i][j].PIECE[1].minPieceSize, 4*60*60)) / 2;
+						
+						if(RUNTYPE[i][j].PIECE[0].desPieceSize == NO_TIME ||
+							RUNTYPE[i][j].PIECE[1].desPieceSize == NO_TIME)
+						{
+							grcp->desPieceSize =
+								(RUNTYPE[i][j].PIECE[0].minPieceSize +
+								RUNTYPE[i][j].PIECE[0].maxPieceSize) / 2;
+						}
+						else
+						{
+							grcp->desPieceSize =
+								(RUNTYPE[i][j].PIECE[0].desPieceSize +
+								RUNTYPE[i][j].PIECE[1].desPieceSize) / 2;
+						}
+						grcp->maxPieceSize =
+							(ProvideDefault(RUNTYPE[i][j].PIECE[0].maxPieceSize, 8*60*60) +
+							ProvideDefault(RUNTYPE[i][j].PIECE[1].maxPieceSize, 8*60*60)) / 2;
+						if(grcp->desPieceSize < grcp->minPieceSize ||
+							grcp->desPieceSize > grcp->maxPieceSize ||
+							grcp->desPieceSize == NO_TIME)
+						{
+							grcp->desPieceSize = (grcp->minPieceSize + grcp->maxPieceSize) / 2;
+						}
+						grcp->maxSpread = ProvideDefault(RUNTYPE[i][j].maxSpreadTime, 24*60*60);
+						//
+						//  Store multi-piece info.
+						//
+						grcp->desPieceSize1 = ProvideDefault(RUNTYPE[i][j].PIECE[0].desPieceSize, 4*60*60);
+						grcp->minPieceSize1 = ProvideDefault(RUNTYPE[i][j].PIECE[0].minPieceSize, 1*60*60);
+						grcp->maxPieceSize1 = ProvideDefault(RUNTYPE[i][j].PIECE[0].maxPieceSize, 8*60*60);
+						grcp->desPieceSize2 = ProvideDefault(RUNTYPE[i][j].PIECE[1].desPieceSize, 4*60*60);
+						grcp->minPieceSize2 = ProvideDefault(RUNTYPE[i][j].PIECE[1].minPieceSize, 1*60*60);
+						grcp->maxPieceSize2 = ProvideDefault(RUNTYPE[i][j].PIECE[1].maxPieceSize, 8*60*60);
+						
+						StatusBarText("Performing Two Piece Run Cut...");
+						PerformTwoPieceRunCut();
+						ReinitializeLeftoverPieces();
+
+						/*
+						StatusBarText("Two Piece Cleanup...");
+						PerformTwoPieceCleanup();
+						ReinitializeLeftoverPieces();
+						*/
+						break;
+						
+					default:  // don't know how to cut this run type !!!
+						break;
 					}
 				}
 			}
 		}
-//
-//  Combine any consecutive 2-piece runs together.
-//
-    if( grcp->fTwoPieceCanBeOne )
-      CombineConsecutiveTwoPiece( runList );
-//
-//  Make sure the runs are sorted - the leads to predictable run numbers
-//
-    SortDList( &runList, CmpRuns );
-
-    InstallRuns();
-
+		//
+		//  Combine any consecutive 2-piece runs together.
+		//
+		if( grcp->fTwoPieceCanBeOne )
+			CombineConsecutiveTwoPiece( runList );
+		//
+		//  Make sure the runs are sorted - the leads to predictable run numbers
+		//
+		SortDList( &runList, CmpRuns );
+		
+		InstallRuns();
+		
 #ifndef PRODUCT
-    PrintRuns();
-    TM( 1, "Leftover Pieces:\n" );
-    PrintPieceList( unexaminedPieceList );
+		PrintRuns();
+		TM( 1, "Leftover Pieces:\n" );
+		PrintPieceList( unexaminedPieceList );
 #endif
-
-    RCFreeAll();
-
-//
-//  Try to improve the runs that we have cut.
-//
-    if(CUTPARMS.flags & CUTPARMSFLAGS_IMPROVE)
-      RuncutImprove( &savings );
+		
+		RCFreeAll();
+		
+		//
+		//  Try to improve the runs that we have cut.
+		//
+		if(CUTPARMS.flags & CUTPARMSFLAGS_IMPROVE)
+			RuncutImprove( &savings );
 	}
 }

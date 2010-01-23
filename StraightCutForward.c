@@ -59,17 +59,21 @@ static Segment  *ForwardFindFeasible( Segment *start, Segment *end,
 {
 	// Find a feasible length piece in this block.
 	Segment	*segment;
-	for( segment = start;; segment = segment->next)
+	for( segment = start;; segment = segment->next )
 	{
 		if( ForwardPieceLength(start, segment) < grcp->minPieceSize )
-			 if( segment == end )
-            break;
-          else
-            continue;
+		{
+			if( segment == end )
+				return NULL;
+			continue;
+		}
 		if( ForwardPieceLength(start, segment) > grcp->maxPieceSize )
-			 break;
-		if( feasibleCostFunc(start, segment) < InfiniteCost )
+			 return NULL;
+
+		if( feasibleCostFunc(start, segment) < InfiniteCost &&
+			(segment == end || ForwardPieceLength(segment, end) >= grcp->minLeftover))
 			return segment;
+
 		if( segment == end )
 			 break;
 	}
@@ -84,78 +88,96 @@ static Segment  *ForwardTuneFeasible( Segment *segment,
 	Segment  *segmentBest, *segmentCur;
 	cron_t	costBest, cost;
 
+	Assert( segment->block == end->block );
+	Assert( segment->block == start->block );
+
 	segmentBest = segment;
-	costBest = desirableCostFunc(start, segment);
+	costBest = desirableCostFunc(start, segmentBest);
 
 	// Try making the piece smaller.
 	if( segment != start )
 	{
-		 for( segmentCur = segment->prev; ; segmentCur = segmentCur->prev )
-		 {
-			  if( ForwardPieceLength(start, segmentCur) < grcp->minPieceSize )
-					break;
-			  cost = desirableCostFunc( start, segmentCur );
-			  if( cost < costBest )
-			  {
-					costBest = cost;
-					segmentBest = segmentCur;
-			  }
-			  if( segmentCur == start )
-					break;
-		 }
+		for( segmentCur = segment;; )
+		{
+			segmentCur = segmentCur->prev;
+
+			if( ForwardPieceLength(start, segmentCur) < grcp->minPieceSize )
+				break;
+			cost = desirableCostFunc( start, segmentCur );
+			if( cost < costBest )
+			{
+				costBest = cost;
+				segmentBest = segmentCur;
+			}
+			if( segmentCur == start )
+				break;
+		}
 	}
 
 	// Try making the piece larger.
 	if( segment != end )
 	{
-		 for( segmentCur = segment->next; ; segmentCur = segmentCur->next )
-		 {
-			  if( ForwardPieceLength(start, segmentCur) > grcp->maxPieceSize )
-					break;
-			  cost = desirableCostFunc( start, segmentCur );
-			  if( cost <= costBest )
-			  {
-					costBest = cost;
-					segmentBest = segmentCur;
-			  }
-			  if( segmentCur == end )
-					break;
-		 }
+		for( segmentCur = segment;; )
+		{
+			segmentCur = segmentCur->next;
+			
+			if( ForwardPieceLength(start, segmentCur) > grcp->maxPieceSize )
+				break;
+			if( ForwardPieceLength(segmentCur, end) < grcp->minLeftover )
+				break;
+			cost = desirableCostFunc( start, segmentCur );
+			if( cost <= costBest )
+			{
+				costBest = cost;
+				segmentBest = segmentCur;
+			}
+			if( segmentCur == end )
+				break;
+		}
+
+		// Try the whole potential piece.
+		segmentCur = end;
+		if( ForwardPieceLength(start, segmentCur) <= grcp->maxPieceSize &&
+			(cost = desirableCostFunc(start, segmentCur)) < costBest )
+		{
+			costBest = cost;
+			segmentBest = segmentCur;
+		}
 	}
 
 	// Return the best found.
 	return segmentBest;
 }
 
-static Segment *ForwardLeaveFeasibleLeftover( Segment *segment,
-															Segment *start, Segment *end,
-															StraightCostFunc feasibleCostFunc,
-															cron_t *pcost ) // return
+static Segment *ForwardLeaveFeasibleLeftover(	Segment *segment,
+												Segment *start, Segment *end,
+												StraightCostFunc feasibleCostFunc,
+												cron_t *pcost ) // return
 {
-   if( segment == end )
-      return segment;
-
-	 // Check that the leftover piece is large enough already.
-	 if( (*pcost = feasibleCostFunc(start, segment)) != InfiniteCost &&
-		  end->end - segment->end >= grcp->minLeftover )
-		  return segment;
-
-	 // Case 1: Try to extend this piece to take the rest of the block.
-	 if( (*pcost = feasibleCostFunc(start, end)) < InfiniteCost )
-		  return end;
-
-	 // Case 2: Try to shorten this piece to leave minLeftover at the end.
-	 for( ; segment != start; segment = segment->prev )
-		  if( end->end - segment->end >= grcp->minLeftover )
-				break;
-	 // Check if it was possible to leave minLeftover.
-	 if( end->end - segment->end < grcp->minLeftover )
-		  return NULL;
-	 // Check if the remaining piece is still feasible.
-	 if( (*pcost = feasibleCostFunc(start, segment)) >= InfiniteCost )
-		  return NULL;
-	 // Otherwise, we successfully shortened the piece.
-	 return segment;
+	if( segment == end )
+		return segment;
+	
+	// Check that the leftover piece is large enough already.
+	if( (*pcost = feasibleCostFunc(start, segment)) != InfiniteCost &&
+		end->end - segment->end >= grcp->minLeftover )
+		return segment;
+	
+	// Case 1: Try to extend this piece to take the rest of the block.
+	if( (*pcost = feasibleCostFunc(start, end)) < InfiniteCost )
+		return end;
+	
+	// Case 2: Try to shorten this piece to leave minLeftover at the end.
+	for( ; segment != start; segment = segment->prev )
+		if( end->end - segment->end >= grcp->minLeftover )
+			break;
+		// Check if it was possible to leave minLeftover.
+		if( end->end - segment->end < grcp->minLeftover )
+			return NULL;
+		// Check if the remaining piece is still feasible.
+		if( (*pcost = feasibleCostFunc(start, segment)) >= InfiniteCost )
+			return NULL;
+		// Otherwise, we successfully shortened the piece.
+		return segment;
 }
 
 int     GetLookaheadCutRange( Segment *segmentStart,

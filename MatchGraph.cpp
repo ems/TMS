@@ -14,58 +14,58 @@
 void MatchGraph::Weighted_Match (int maximize)
 {
     long g, j, w, outcome, loop=1;
-
+	
     /* set up internal data structure */
     SetUp();
-
+	
     Initialize(maximize);
-
+	
     for(;;) {
-	/* printf("Augment #%d\n",loop++); */
-	DELTA = 0;
-	for (v=1; v<=U; ++v)
-	    if (MATE[(int)v] == DUMMYEDGE)
-		POINTER (DUMMYVERTEX, v, DUMMYEDGE);
-	for(;;) {
-	    i = 1;
-	    for (j=2; j<=U; ++j)
-		if (NEXT_D[(int)i] > NEXT_D[(int)j])
-		    i = j;
-	    DELTA = NEXT_D[(int)i];
-	    if (DELTA == LAST_D)
-		goto done;
-	    v = BASE[(int)i];
-	    if (LINK[(int)v] >= 0) {
-		PAIR (&outcome);
-		if (outcome == 1)
-		    break;
-	    }
-	    else {
-		w = BMATE (v);
-		if (LINK[(int)w] < 0) {
-		    POINTER (v, w, OPPEDGE(NEXTEDGE[(int)i]));
-		}
-		else UNPAIR (v, w);
-	    }
-	}
-
-	LAST_D -=DELTA;
-	SET_MATCH_BOUNDS();
-	g = OPPEDGE(e);
-	REMATCH (BEND(e), g);
-	REMATCH (BEND(g), e);
+		/* printf("Augment #%d\n",loop++); */
+		DELTA = 0;
+		for (v=1; v<=U; ++v)
+			if (MATE[(int)v] == DUMMYEDGE)
+				POINTER (DUMMYVERTEX, v, DUMMYEDGE);
+			for(;;) {
+				i = 1;
+				for (j=2; j<=U; ++j)
+					if (NEXT_D[(int)i] > NEXT_D[(int)j])
+						i = j;
+					DELTA = NEXT_D[(int)i];
+					if (DELTA == LAST_D)
+						goto done;
+					v = BASE[(int)i];
+					if (LINK[(int)v] >= 0) {
+						PAIR (&outcome);
+						if (outcome == 1)
+							break;
+					}
+					else {
+						w = BMATE (v);
+						if (LINK[(int)w] < 0) {
+							POINTER (v, w, OPPEDGE(NEXTEDGE[(int)i]));
+						}
+						else UNPAIR (v, w);
+					}
+			}
+			
+			LAST_D -=DELTA;
+			SET_MATCH_BOUNDS();
+			g = OPPEDGE(e);
+			REMATCH (BEND(e), g);
+			REMATCH (BEND(g), e);
     }
-
- done:
+	
+done:
     SET_MATCH_BOUNDS();
     UNPAIR_ALL();
     for (i=1; i<=U;++i)
     {
-	MATE[(int)i] = END[(int)MATE[(int)i]];
-	if (MATE[(int)i]==DUMMYVERTEX)
-	    MATE[(int)i]=0;
+		MATE[(int)i] = END[(int)MATE[(int)i]];
+		if (MATE[(int)i]==DUMMYVERTEX)
+			MATE[(int)i]=0;
     }
-
+	
     FreeUp();
 }
 
@@ -73,36 +73,36 @@ void MatchGraph::Weighted_Match (int maximize)
 void MatchGraph::Initialize(int maximize)
 {
     long i, allocsize, max_wt= -MAXWT, min_wt=MAXWT;
-
+	
     DUMMYVERTEX = U+1;
     DUMMYEDGE = U+2*V+1;
     END[(int)DUMMYEDGE] = DUMMYVERTEX;
-
+	
     for (i=U+2; i<=U+2*V; i+=2)
     {
-	if (WEIGHT[(int)i] > max_wt)
-	    max_wt = WEIGHT[(int)i];
-	if (WEIGHT[(int)i] < min_wt)
-	    min_wt = WEIGHT[(int)i];
+		if (WEIGHT[(int)i] > max_wt)
+			max_wt = WEIGHT[(int)i];
+		if (WEIGHT[(int)i] < min_wt)
+			min_wt = WEIGHT[(int)i];
     }
     if (!maximize)
     {
-	if (U%2!=0)
-	{
-	    printf("Must have an even number of vertices to do a\n");
-	    printf("minimum complete matching.\n");
-	    exit(0);
-	}
-	max_wt += 2L;		/* Don't want all zero weight */
+		if (U%2!=0)
+		{
+			printf("Must have an even number of vertices to do a\n");
+			printf("minimum complete matching.\n");
+			exit(0);
+		}
+		max_wt += 2L;		/* Don't want all zero weight */
 #ifndef SHOULD_NOT_BE_NECESSARY_BUT_SEEMS_TO_WORK
-	max_wt *= 2L;
+		max_wt *= 2L;
 #endif
-	for (i=U+1; i<=U+2*V; i++)
-	    WEIGHT[(int)i] = max_wt-WEIGHT[(int)i];
-	max_wt = max_wt-min_wt;
+		for (i=U+1; i<=U+2*V; i++)
+			WEIGHT[(int)i] = max_wt-WEIGHT[(int)i];
+		max_wt = max_wt-min_wt;
     }
     LAST_D = max_wt/2L;
-
+	
     if( MATE ) delete [] MATE;
     allocsize = U + 2L;
     MATE     = new long[(size_t)allocsize];
@@ -115,7 +115,7 @@ void MatchGraph::Initialize(int maximize)
     NEXTEDGE = new long[(size_t)allocsize];
     allocsize = U + 2L*V + 2L;
     NEXTPAIR = new long[(size_t)allocsize];
-
+	
     for (i = 0; i <= U+1; ++i) {
 		MATE[(int)i] = DUMMYEDGE;
 		NEXTEDGE[(int)i] = DUMMYEDGE;

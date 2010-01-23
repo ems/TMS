@@ -38,7 +38,7 @@ void MatchPieces()
     }
 
     // Set up the valid match possibilities.
-    int         addedMatchEdge = 0;
+    bool         addedMatchEdge = false;
     for( int fromC = 0; fromC < numPiece; fromC++ )
     {
         for( int toC = fromC+1; toC < numPiece; toC++ )
@@ -80,7 +80,7 @@ void MatchPieces()
                 // Add the penalty relief edge.
                 mg.AddEdge( fromC*2L+2L, toC*2L+2L, 0L );
 
-                addedMatchEdge = 1;
+                addedMatchEdge = true;
             }
         }
     }

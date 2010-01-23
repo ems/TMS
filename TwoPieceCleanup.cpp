@@ -13,23 +13,26 @@ extern "C" {
 #include "HashFI.h"
 #include <set>
 
-//#define AssertTrue( c ) do { if( !(c) ) { int a = 0, b; b = 10 / a; } } while(0)
-#define AssertTrue(c)
+//#ifdef Assert
+//#undef Assert
+//#define Assert( c ) do { if( !(c) ) { int a = 0, b; b = 10 / a; } } while(0)
+//#define Assert(c)
+//#endif
 
 typedef	HashFI< Piece *, Piece * > PieceCollection;
 
-#define	cond(a, op, b) (a) op (b) ? 1 : (b) op (a) ? 0
+#define	cond(a, op, b) (a) op (b) ? true : (b) op (a) ? false
 
 struct decreasingEndTimeCmp
 {
-	int operator()( const Piece *p1, const Piece *p2 ) const
+	bool operator()( const Piece *p1, const Piece *p2 ) const
 	{ return cond(p1->segmentEnd->end, >, p2->segmentEnd->end) : p1 > p2; }
 };
 typedef std::set< Piece *, decreasingEndTimeCmp > DecreasingEndTime;
 
 struct increasingStartTimeCmp
 {
-	int operator()( const Piece *p1, const Piece *p2 ) const
+	bool operator()( const Piece *p1, const Piece *p2 ) const
 	{ return cond(p1->segmentStart->start, <, p2->segmentStart->start) : p1 < p2; }
 };
 typedef std::set< Piece *, increasingStartTimeCmp > IncreasingStartTime;
@@ -49,6 +52,9 @@ static	void	TwoPieceEndCleanup()
 
 	while( (p = unexaminedPieceList) != NULL )
 	{
+		Assert( p->segmentStart->block == p->segmentEnd->block );
+		Assert( p->segmentStart->start < p->segmentEnd->end );
+
 		if( PieceLength(p) < grcp->minLeftover )
 		{
 	        ChangePieceStatus( p, Invalid );
@@ -61,11 +67,15 @@ static	void	TwoPieceEndCleanup()
 	// If there are any valid pieces, try to match them up.
 	cron_t	costTmp;
 	Piece	rgPiece[2];
-	DecreasingEndTime::iterator d;
-	while( !((d = decreasingEndTime.begin()) == decreasingEndTime.end()) )
+	
+	while( !decreasingEndTime.empty() )
 	{
+		DecreasingEndTime::iterator d = decreasingEndTime.begin();
 		p = *d; decreasingEndTime.erase( d );
-		AssertTrue( p->status == Valid && validPieceList != NULL );
+
+		Assert( p->status == Valid && validPieceList != NULL );
+		Assert( p->segmentStart->block == p->segmentEnd->block );
+		Assert( p->segmentStart->start < p->segmentEnd->end );
 
 		if( p->segmentEnd->end < grcp->endRunAfterTime )
 			break;
@@ -96,11 +106,11 @@ static	void	TwoPieceEndCleanup()
 				// Set up the segments of this piece.
 				pNew->segmentStart = p->segmentStart;
 				pNew->segmentEnd = s->prev;
-				AssertTrue( PieceLength(pNew) >= grcp->minLeftover );
+				Assert( PieceLength(pNew) >= grcp->minLeftover );
 
 				// Update the given piece to reflect the split.
 				p->segmentStart = s;
-				AssertTrue( PieceLength(p) >= grcp->minPieceSize2 );
+				Assert( PieceLength(p) >= grcp->minPieceSize2 );
 				if( PieceLength(pNew) < grcp->minPieceSize2 && PieceLength(pNew) < grcp->minPieceSize1 )
 					pNew->status = Invalid;
 				else
@@ -119,12 +129,11 @@ static	void	TwoPieceEndCleanup()
 		pSearch.segmentStart = NULL;
 		pSearch.segmentEnd = &last;
 
-		DecreasingEndTime::iterator d;
 		Piece	*pBest = NULL;
 		cron_t	cost, costBest;
 		pSearch.segmentEnd->start = p->segmentStart->start;
 		pSearch.segmentEnd->end   = p->segmentStart->start;
-		for( d = decreasingEndTime.lower_bound(&pSearch); !(d == decreasingEndTime.end()); ++d )
+		for( d = decreasingEndTime.lower_bound(&pSearch); d != decreasingEndTime.end(); ++d )
 		{
 			Piece *pCur = *d;
 			if( p->segmentEnd->end - pCur->segmentEnd->end > grcp->maxSpread )
@@ -172,14 +181,16 @@ static	void	TwoPieceEndCleanup()
 		grcp->maxPieceSize = grcp->maxPieceSize1;
 
 		Segment	*segmentBest = NULL;
-		int		backwardBest = 1;
+		bool	backwardBest = true;
 		pSearch.segmentEnd->start = p->segmentEnd->end;
 		pSearch.segmentEnd->end   = p->segmentEnd->end;
-		for( d = decreasingEndTime.lower_bound(&pSearch); !(d == decreasingEndTime.end()); ++d )
+		for( d = decreasingEndTime.lower_bound(&pSearch); d != decreasingEndTime.end(); ++d )
 		{
 			Piece *pCur = *d;
 			if( p->segmentEnd->end - pCur->segmentEnd->end > grcp->maxSpread )
 				break;
+
+			Assert( pCur->segmentStart->block == pCur->segmentEnd->block );
 
 			Segment *s = StraightFindBackwardSplit( pCur->segmentEnd, pCur->segmentStart, &costTmp );
 			if( s != NULL )
@@ -194,7 +205,7 @@ static	void	TwoPieceEndCleanup()
 				if( cost < InfiniteCost && (pBest == NULL || cost < costBest) )
 				{
 					segmentBest = s;
-					backwardBest = 1;
+					backwardBest = true;
 					costBest = cost;
 					pBest = pCur;
 				}
@@ -213,7 +224,7 @@ static	void	TwoPieceEndCleanup()
 				if( cost < InfiniteCost && (pBest == NULL || cost < costBest) )
 				{
 					segmentBest = s;
-					backwardBest = 0;
+					backwardBest = false;
 					costBest = cost;
 					pBest = pCur;
 				}
@@ -232,12 +243,12 @@ static	void	TwoPieceEndCleanup()
 				// Set up the segments of this piece.
 				pNew->segmentStart = segmentBest;
 				pNew->segmentEnd = pBest->segmentEnd;
-				AssertTrue( PieceLength(pNew) >= grcp->minLeftover );
+				Assert( PieceLength(pNew) >= grcp->minLeftover );
 
 				// Update the given piece to reflect the split.
 				decreasingEndTime.erase( pBest );
 				pBest->segmentEnd = segmentBest->prev;
-				AssertTrue( PieceLength(pBest) >= grcp->minLeftover );
+				Assert( PieceLength(pBest) >= grcp->minLeftover );
 				if( PieceLength(pBest) < grcp->minPieceSize1 && PieceLength(pBest) < grcp->minPieceSize2 )
 					ChangePieceStatus( pBest, Invalid );
 				else
@@ -248,11 +259,11 @@ static	void	TwoPieceEndCleanup()
 				// Set up the segments of this piece.
 				pNew->segmentStart = pBest->segmentStart;
 				pNew->segmentEnd = segmentBest;
-				AssertTrue( PieceLength(pNew) >= grcp->minLeftover );
+				Assert( PieceLength(pNew) >= grcp->minLeftover );
 
 				// Update the given piece to reflect the split.
 				pBest->segmentStart = segmentBest->next;
-				AssertTrue( PieceLength(pBest) >= grcp->minLeftover );
+				Assert( PieceLength(pBest) >= grcp->minLeftover );
 				if( PieceLength(pBest) < grcp->minPieceSize1 && PieceLength(pBest) < grcp->minPieceSize2 )
 				{
 					ChangePieceStatus( pBest, Invalid );
@@ -273,7 +284,7 @@ static	void	TwoPieceEndCleanup()
 		Segment	*sEnd, *segmentEndBest = NULL;
 		pSearch.segmentEnd->start = p->segmentEnd->end;
 		pSearch.segmentEnd->end   = p->segmentEnd->end;
-		for( d = decreasingEndTime.lower_bound(&pSearch); !(d == decreasingEndTime.end()); ++d )
+		for( d = decreasingEndTime.lower_bound(&pSearch); d != decreasingEndTime.end(); ++d )
 		{
 			Piece *pCur = *d;
 			if( p->segmentEnd->end - pCur->segmentEnd->end > grcp->maxSpread )
@@ -357,13 +368,13 @@ static	void	TwoPieceEndCleanup()
 			pNew->status = Allocated;
 			pNew->segmentStart = segmentBest;
 			pNew->segmentEnd = segmentEndBest;
-			AssertTrue( PieceLength(pNew) >= grcp->minLeftover );
+			Assert( PieceLength(pNew) >= grcp->minLeftover );
 
 			// Set up the segments of the leftover piece.
 			Piece *pLeftover = NewPiece();
 			pLeftover->segmentStart = pBest->segmentStart;
 			pLeftover->segmentEnd = segmentBest->prev;
-			AssertTrue( PieceLength(pLeftover) >= grcp->minLeftover );
+			Assert( PieceLength(pLeftover) >= grcp->minLeftover );
 			if( PieceLength(pLeftover) < grcp->minPieceSize1 && PieceLength(pLeftover) < grcp->minPieceSize2 )
 				pLeftover->status = Invalid;
 			else
@@ -375,7 +386,7 @@ static	void	TwoPieceEndCleanup()
 
 			// Modify the segments of the original piece.
 			pBest->segmentStart = segmentEndBest->next;
-			AssertTrue( PieceLength(pBest) >= grcp->minLeftover );
+			Assert( PieceLength(pBest) >= grcp->minLeftover );
 			if( PieceLength(pBest) < grcp->minPieceSize1 && PieceLength(pBest) < grcp->minPieceSize2 )
 			{
 				decreasingEndTime.erase( pBest );
@@ -463,11 +474,11 @@ static	void	TwoPieceStartCleanup()
 				// Set up the segments of this piece.
 				pNew->segmentStart = s->next;
 				pNew->segmentEnd = p->segmentEnd;
-				AssertTrue( PieceLength(pNew) >= grcp->minLeftover );
+				Assert( PieceLength(pNew) >= grcp->minLeftover );
 
 				// Update the given piece to reflect the split.
 				p->segmentEnd = s;
-				AssertTrue( PieceLength(p) >= grcp->minPieceSize1 );
+				Assert( PieceLength(p) >= grcp->minPieceSize1 );
 				if( PieceLength(pNew) < grcp->minPieceSize1 && PieceLength(pNew) < grcp->minPieceSize2 )
 					pNew->status = Invalid;
 				else
@@ -596,11 +607,11 @@ static	void	TwoPieceStartCleanup()
 				// Set up the segments of this piece.
 				pNew->segmentStart = segmentBest;
 				pNew->segmentEnd = pBest->segmentEnd;
-				AssertTrue( PieceLength(pNew) >= grcp->minLeftover );
+				Assert( PieceLength(pNew) >= grcp->minLeftover );
 
 				// Update the given piece to reflect the split.
 				pBest->segmentEnd = segmentBest->prev;
-				AssertTrue( PieceLength(pBest) >= grcp->minLeftover );
+				Assert( PieceLength(pBest) >= grcp->minLeftover );
 				if( PieceLength(pBest) < grcp->minPieceSize1 && PieceLength(pBest) < grcp->minPieceSize2 )
 				{
 					ChangePieceStatus( pBest, Invalid );
@@ -612,12 +623,12 @@ static	void	TwoPieceStartCleanup()
 				// Set up the segments of this piece.
 				pNew->segmentStart = pBest->segmentStart;
 				pNew->segmentEnd = segmentBest;
-				AssertTrue( PieceLength(pNew) >= grcp->minLeftover );
+				Assert( PieceLength(pNew) >= grcp->minLeftover );
 
 				// Update the given piece to reflect the split.
 				increasingStartTime.erase( pBest );
 				pBest->segmentStart = segmentBest->next;
-				AssertTrue( PieceLength(pBest) >= grcp->minLeftover );
+				Assert( PieceLength(pBest) >= grcp->minLeftover );
 				if( PieceLength(pBest) < grcp->minPieceSize1 && PieceLength(pBest) < grcp->minPieceSize2 )
 					ChangePieceStatus( pBest, Invalid );
 				else
@@ -691,13 +702,13 @@ static	void	TwoPieceStartCleanup()
 			pNew->status = Allocated;
 			pNew->segmentStart = segmentStartBest;
 			pNew->segmentEnd = segmentBest;
-			AssertTrue( PieceLength(pNew) >= grcp->minLeftover );
+			Assert( PieceLength(pNew) >= grcp->minLeftover );
 
 			// Set up the segments of the leftover piece.
 			Piece *pLeftover = NewPiece();
 			pLeftover->segmentStart = segmentBest->next;
 			pLeftover->segmentEnd = pBest->segmentEnd;
-			AssertTrue( PieceLength(pLeftover) >= grcp->minLeftover );
+			Assert( PieceLength(pLeftover) >= grcp->minLeftover );
 			if( PieceLength(pLeftover) < grcp->minPieceSize1 && PieceLength(pLeftover) < grcp->minPieceSize2 )
 				pLeftover->status = Invalid;
 			else
@@ -709,7 +720,7 @@ static	void	TwoPieceStartCleanup()
 
 			// Modify the segments of the original piece.
 			pBest->segmentEnd = segmentStartBest->prev;
-			AssertTrue( PieceLength(pBest) >= grcp->minLeftover );
+			Assert( PieceLength(pBest) >= grcp->minLeftover );
 			if( PieceLength(pBest) < grcp->minPieceSize1 && PieceLength(pBest) < grcp->minPieceSize2 )
 			{
 				increasingStartTime.erase( pBest );

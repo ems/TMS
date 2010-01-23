@@ -37,22 +37,33 @@
 
 // These defines control messaging and Asserts.
 #define PRODUCT
+//#undef PRODUCT
+#define NOLOG
 #define KEEPASSERTS
 
 #define FFNameMatch(f,m)        True
 #ifndef PRODUCT
     extern char szLogTmp[2048];
     extern int logMsg( char *sz );
-#   define log(s) logMsg(s)
-#   define TExec(grbMask,w)     if(FFNameMatch(__FILE__,(grbMask))){w;}else{;}
+#   define TExec(grbMask,w)     do{ if(FFNameMatch(__FILE__,(grbMask))){w;} } while(0)
+#ifdef NOLOG
+#   define TM(grbMask,w1)
+#   define TM1(grbMask,w1,w2)
+#   define TM2(grbMask,w1,w2,w3)
+#   define TM3(grbMask,w1,w2,w3,w4)
+#   define TM4(grbMask,w1,w2,w3,w4,w5)
+#   define TM5(grbMask,w1,w2,w3,w4,w5,w6)
+#   define TM6(grbMask,w1,w2,w3,w4,w5,w6,w7)
+#else
 #   define TPrint(grbMask,w)        (FFNameMatch(__FILE__,(grbMask))?((w),True):False)
-#   define TM(grbMask,w1)           TPrint((grbMask),(sprintf(szLogTmp,(w1)),log(szLogTmp)))
-#   define TM1(grbMask,w1,w2)       TPrint((grbMask),(sprintf(szLogTmp,(w1),(w2)),log(szLogTmp)))
-#   define TM2(grbMask,w1,w2,w3)        TPrint((grbMask),(sprintf(szLogTmp,(w1),(w2),(w3)),log(szLogTmp)))
-#   define TM3(grbMask,w1,w2,w3,w4) TPrint((grbMask),(sprintf(szLogTmp,(w1),(w2),(w3),(w4)),log(szLogTmp)))
-#   define TM4(grbMask,w1,w2,w3,w4,w5)  TPrint((grbMask),(sprintf(szLogTmp,(w1),(w2),(w3),(w4),(w5)),log(szLogTmp)))
-#   define TM5(grbMask,w1,w2,w3,w4,w5,w6)   TPrint((grbMask),(sprintf(szLogTmp,(w1),(w2),(w3),(w4),(w5),(w6)),log(szLogTmp)))
-#   define TM6(grbMask,w1,w2,w3,w4,w5,w6,w7)    TPrint((grbMask),(sprintf(szLogTmp,(w1),(w2),(w3),(w4),(w5),(w6),(w7)),log(szLogTmp)))
+#   define TM(grbMask,w1)           TPrint((grbMask),(sprintf(szLogTmp,(w1)),logMsg(szLogTmp)))
+#   define TM1(grbMask,w1,w2)       TPrint((grbMask),(sprintf(szLogTmp,(w1),(w2)),logMsg(szLogTmp)))
+#   define TM2(grbMask,w1,w2,w3)        TPrint((grbMask),(sprintf(szLogTmp,(w1),(w2),(w3)),logMsg(szLogTmp)))
+#   define TM3(grbMask,w1,w2,w3,w4) TPrint((grbMask),(sprintf(szLogTmp,(w1),(w2),(w3),(w4)),logMsg(szLogTmp)))
+#   define TM4(grbMask,w1,w2,w3,w4,w5)  TPrint((grbMask),(sprintf(szLogTmp,(w1),(w2),(w3),(w4),(w5)),logMsg(szLogTmp)))
+#   define TM5(grbMask,w1,w2,w3,w4,w5,w6)   TPrint((grbMask),(sprintf(szLogTmp,(w1),(w2),(w3),(w4),(w5),(w6)),logMsg(szLogTmp)))
+#   define TM6(grbMask,w1,w2,w3,w4,w5,w6,w7)    TPrint((grbMask),(sprintf(szLogTmp,(w1),(w2),(w3),(w4),(w5),(w6),(w7)),logMsg(szLogTmp)))
+#endif
 #   define  Assert( fCond )         ( !(fCond)?AssertHandler(__FILE__,__LINE__):True)
 #else
 #   define TExec(grbMask,w1)

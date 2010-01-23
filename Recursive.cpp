@@ -1028,7 +1028,7 @@ RecursiveCut::RunDoneStatus		RecursiveCut::checkRunDone()
 	COSTDef	cost;
 	const long	costedRunType = RunCoster( &pr, NO_RUNTYPE, &cost );
 	RRun::incCostCount();
-	if( RRun::getCostCount() % 20 == 0 )
+	if( RRun::getCostCount() % 1000 == 0 )
 	{
 		sprintf(tempString, "Tries: %d  Runs cut: %d", RRun::getCostCount(), (int)runs.size() );
 		StatusBarText(tempString);
