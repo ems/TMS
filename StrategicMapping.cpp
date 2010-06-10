@@ -592,6 +592,8 @@ void SMAddBus(long BUSESrecordID)
 //
 void SendEMail(char *pszSubjectText, char *pszBodyText)
 {
+  MessageBox(NULL, pszSubjectText, TMS, MB_OK);
+/*
   LPFNMAPISENDMAIL m_lpfnMAPISendMail;
   HINSTANCE m_hlibMAPI;
 
@@ -619,6 +621,7 @@ void SendEMail(char *pszSubjectText, char *pszBodyText)
   ULONG ulResult = m_lpfnMAPISendMail(0, 0, &message, MAPI_LOGON_UI, 0);
 
   AfxFreeLibrary(m_hlibMAPI);
+*/
 }
 
 //
@@ -626,6 +629,9 @@ void SendEMail(char *pszSubjectText, char *pszBodyText)
 //
 void SendDebugEMail(char *pszSubjectText, char *pszBodyText)
 {
+  MessageBox(NULL, pszSubjectText, TMS, MB_OK);
+
+
   LPFNMAPISENDMAIL m_lpfnMAPISendMail;
   HINSTANCE m_hlibMAPI;
 

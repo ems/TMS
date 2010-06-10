@@ -5,6 +5,7 @@
 //
 // CCSupervisor.cpp : implementation file
 //
+#pragma warning (disable: 4786)
 
 #include "stdafx.h"
 extern "C"

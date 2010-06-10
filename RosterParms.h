@@ -55,6 +55,8 @@ protected:
   CButton*  pButtonFORCEEXTRASTOWEEKENDS;
   CEdit*    pEditMINWORK;
   CEdit*    pEditMAXWORK;
+  CButton*  pButtonSTARTSAFTER;
+  CButton*  pButtonENDSAFTER;
   CEdit*    pEditNIGHTWORKAFTER;
   CEdit*    pEditMAXNIGHTWORK;
   CButton*  pButtonOFFDAYMUSTFOLLOW;

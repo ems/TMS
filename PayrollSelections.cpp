@@ -26,6 +26,7 @@ CPayrollSelections::CPayrollSelections(CWnd* pParent, PayrollSelectionsDef* pPS)
 	: CDialog(CPayrollSelections::IDD, pParent)
 {
   m_pPS = pPS;
+  pButtonFILE = NULL;
 
 	//{{AFX_DATA_INIT(CPayrollSelections)
 		// NOTE: the ClassWizard will add member initialization here
@@ -377,7 +378,7 @@ void CPayrollSelections::OnOK()
 
 void CPayrollSelections::OnChangeDaysinperiod() 
 {
-  if(!IsWindow(pButtonFILE->m_hWnd))
+  if(pButtonFILE == NULL || !IsWindow(pButtonFILE->m_hWnd))
   {
     return;
   }

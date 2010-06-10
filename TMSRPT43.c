@@ -42,6 +42,7 @@ BOOL FAR TMSRPT43(TMSRPTPassedDataDef *pPassedData)
   char  lastName[DRIVERS_LASTNAME_LENGTH + 1];
   char  firstName[DRIVERS_FIRSTNAME_LENGTH + 1];
   char  badgeNumber[DRIVERS_BADGENUMBER_LENGTH + 1];
+  char  szDriver[512]; 
   char  outputString[512];
   long  year, month, day;
   long  blockNumber;
@@ -258,6 +259,29 @@ BOOL FAR TMSRPT43(TMSRPTPassedDataDef *pPassedData)
         btrieve(B_GETEQUAL, TMS_RUNS, &RUNS, &RUNSKey0, 0);
         runNumber = RUNS.runNumber;
 //
+//  Driver
+//
+        DRIVERSKey0.recordID = DAILYOPS.DRIVERSrecordID;
+        rcode2 = btrieve(B_GETEQUAL, TMS_DRIVERS, &DRIVERS, &DRIVERSKey0, 0);
+        if(rcode2 != 0)
+        {
+          strcpy(szDriver, "*** Driver not found ***");
+        }
+        else
+        {
+          strncpy(badgeNumber, DRIVERS.badgeNumber, DRIVERS_BADGENUMBER_LENGTH);
+          trim(badgeNumber, DRIVERS_BADGENUMBER_LENGTH);
+          strncpy(lastName, DRIVERS.lastName, DRIVERS_LASTNAME_LENGTH);
+          trim(lastName, DRIVERS_LASTNAME_LENGTH);
+          strncpy(firstName, DRIVERS.firstName, DRIVERS_FIRSTNAME_LENGTH);
+          trim(firstName, DRIVERS_FIRSTNAME_LENGTH);
+          strcpy(szDriver, badgeNumber);
+          strcat(szDriver, " - ");
+          strcat(szDriver, lastName);
+          strcat(szDriver, ", ");
+          strcat(szDriver, firstName);
+        }
+//
 //  Now, the various flags within bus
 //
 //  RecordID
@@ -398,6 +422,18 @@ BOOL FAR TMSRPT43(TMSRPTPassedDataDef *pPassedData)
         else if(DAILYOPS.recordFlags & DAILYOPS_FLAG_BUSUNMARKEDASSIGHTSEEING)
         {
           sprintf(tempString, "Bus %s: Unmarked as Sightseeing", busNumber);
+          strcat(outputString, tempString);
+          bDoneOne = TRUE;
+        }
+        else if(DAILYOPS.recordFlags & DAILYOPS_FLAG_BUSOPERATORASSIGNMENT)
+        {
+          sprintf(tempString, "%s assigned to Bus %s, Block %ld", szDriver, busNumber, blockNumber);
+          strcat(outputString, tempString);
+          bDoneOne = TRUE;
+        }
+        else if(DAILYOPS.recordFlags & DAILYOPS_FLAG_BUSOPERATORDEASSIGNMENT)
+        {
+          sprintf(tempString, "%s deassigned from Bus %s, Block %ld", szDriver, busNumber, blockNumber);
           strcat(outputString, tempString);
           bDoneOne = TRUE;
         }

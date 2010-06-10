@@ -478,8 +478,10 @@ EXTERN DIRECTIONSKey1Def DIRECTIONSKey1;
 //                   9-12  Directions Table Record ID Pointer (1/2)
 //                  13-16  Directions Table Record ID Pointer (2/2)
 //                  17-24  Route Number (Stored as an 8-byte character)
-//                  25-88  Route Name
-//                  89-92  Reserved
+//                  25-80  Route Name
+//                  81-84  Alternate route number (numeric)
+//                  85-90  Outbound Bay NODESrecordID
+//                  91-92  Inbound Bay NODESrecordID
 //                  93-96  Record Flags
 //
 #define ROUTES_FLAG_EMPSHUTTLE  0x0001
@@ -487,7 +489,7 @@ EXTERN DIRECTIONSKey1Def DIRECTIONSKey1;
 #define ROUTES_FLAG_RGRP        0x0004
 #define ROUTES_MAX_DIRECTIONS   2
 #define ROUTES_NUMBER_LENGTH    8
-#define ROUTES_NAME_LENGTH     64
+#define ROUTES_NAME_LENGTH     60
 #define ROUTES_RESERVED_LENGTH  0
 typedef struct ROUTESStruct
 {
@@ -496,6 +498,7 @@ typedef struct ROUTESStruct
   long DIRECTIONSrecordID[ROUTES_MAX_DIRECTIONS];
   char number[ROUTES_NUMBER_LENGTH];
   char name[ROUTES_NAME_LENGTH];
+  long alternate;
   short int OBBayNODESrecordID;  // Temporarily short int until more space
   short int IBBayNODESrecordID;  // Temporarily short int until more space
 //  char reserved[ROUTES_RESERVED_LENGTH];
@@ -749,12 +752,16 @@ EXTERN NODESKey2Def NODESKey2;
 //                  21-24  Pattern Names Table Record ID Pointer
 //                  25-28  Nodes Table Record ID Pointer
 //                  29-32  Node Sequence Number
-//                  33-60  Reserved
+//                  33-44  "From" Text
+//                  47-56  "To" Text
+//                  57-60  Reserved
 //                  61-64  Record Flags
 //
 #define PATTERNS_FLAG_MLP        0x0001
 #define PATTERNS_FLAG_BUSSTOP    0x0002
-#define PATTERNS_RESERVED_LENGTH 28
+#define PATTERNS_RESERVED_LENGTH 4
+#define PATTERNS_FROMTEXT_LENGTH 12
+#define PATTERNS_TOTEXT_LENGTH   12
 typedef struct PATTERNSStruct
 {
   long recordID;
@@ -765,6 +772,8 @@ typedef struct PATTERNSStruct
   long PATTERNNAMESrecordID;
   long NODESrecordID;
   long nodeSequence;
+  char fromText[PATTERNS_FROMTEXT_LENGTH];
+  char toText[PATTERNS_TOTEXT_LENGTH];
   char reserved[PATTERNS_RESERVED_LENGTH];
   long flags;
 } PATTERNSDef;
@@ -2541,7 +2550,9 @@ EXTERN OLDDAILYOPSKey3Def OLDDAILYOPSKey3;
 #define DAILYOPS_FLAG_BUSMARKEDASCHARTER       0x00040000
 #define DAILYOPS_FLAG_BUSUNMARKEDASCHARTER     0x00080000
 #define DAILYOPS_FLAG_BUSMARKEDASSIGHTSEEING   0x00100000
-#define DAILYOPS_FLAG_BUSUNMARKEDASSIGHTSEEING 0x00200000 
+#define DAILYOPS_FLAG_BUSUNMARKEDASSIGHTSEEING 0x00200000
+#define DAILYOPS_FLAG_BUSOPERATORASSIGNMENT    0x00400000
+#define DAILYOPS_FLAG_BUSOPERATORDEASSIGNMENT  0x00800000 
 
 #define DAILYOPS_FLAG_DISPATCHER               0x03
 #define DAILYOPS_FLAG_DISPATCHERSIGNIN         0x00000001

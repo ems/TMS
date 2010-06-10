@@ -6,6 +6,8 @@
 #include "TMSHeader.h"
 #include "rc.h"
 
+extern void BinRuncutSolve();
+
 #ifndef PRODUCT
 static const char *logFile = "c:\\windows\\tmslog.txt";
 static long msgCount = 0;
@@ -518,6 +520,7 @@ static void InstallRun( Run *run, long runNumber )
 {
     Piece       *piece;
     Segment     *segment;
+	RELIEFPOINTSDef *r;
     int         pieceNumber = 1;
 
 	SortDList( &run->pieceList, CmpPieceStart );
@@ -525,13 +528,15 @@ static void InstallRun( Run *run, long runNumber )
     {
         ForAllPieceSegmentsDo( piece, segment )
         {
-            m_pRELIEFPOINTS[segment->iFromIndex].start.recordID = NO_RECORD;
-            m_pRELIEFPOINTS[segment->iFromIndex].start.runNumber = runNumber;
-            m_pRELIEFPOINTS[segment->iFromIndex].start.pieceNumber = pieceNumber;
+			r = m_pRELIEFPOINTS + segment->iFromIndex;
+            r->start.recordID = NO_RECORD;
+            r->start.runNumber = runNumber;
+            r->start.pieceNumber = pieceNumber;
 
-            m_pRELIEFPOINTS[segment->iToIndex].end.recordID = NO_RECORD;
-            m_pRELIEFPOINTS[segment->iToIndex].end.runNumber = runNumber;
-            m_pRELIEFPOINTS[segment->iToIndex].end.pieceNumber = pieceNumber;
+			r = m_pRELIEFPOINTS + segment->iToIndex;
+            r->end.recordID = NO_RECORD;
+            r->end.runNumber = runNumber;
+            r->end.pieceNumber = pieceNumber;
         }
         pieceNumber++;
     }
@@ -733,6 +738,8 @@ void AutomaticRunCut(short int wmId)
 						if( cutTwoPieceBefore )
 							break;
 						cutTwoPieceBefore = TRUE;
+//#define OLD_WAY
+#ifdef OLD_WAY
 						//
 						//  This gets a bit tricky on what to do here since I do
 						//  not know beforehand where the piece is going to go
@@ -786,6 +793,18 @@ void AutomaticRunCut(short int wmId)
 						PerformTwoPieceCleanup();
 						ReinitializeLeftoverPieces();
 						*/
+#else // NEW_WAY
+						StatusBarText("Performing Two Piece Run Cut...");
+
+						// Epilog.
+						RCFreeAll();
+
+						BinRuncutSolve();
+
+						InitSegments(1);		
+						InitBlocks();
+						InitPieces();
+#endif
 						break;
 						
 					default:  // don't know how to cut this run type !!!

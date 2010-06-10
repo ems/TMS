@@ -6,7 +6,8 @@
 #include <math.h>
 #include <match.H>
 extern "C" {
-#include <rc.h>
+#include "TMSHeader.h"
+#include "rc.h"
 }
 
 #define	AddToList(h,n)	((n)->next = (h), (h) = (n))
@@ -38,6 +39,8 @@ void MatchPieces()
     }
 
     // Set up the valid match possibilities.
+	StatusBarText( "Connecting potential pieces..." );
+
     bool         addedMatchEdge = false;
     for( int fromC = 0; fromC < numPiece; fromC++ )
     {
@@ -88,6 +91,7 @@ void MatchPieces()
         return;
 
     // Perform the minimum cost matching.
+	StatusBarText( "Matching potential pieces..." );
     mg.Weighted_Match( 0 );
 
     // Install the matched pieces into the appropriate data structures.

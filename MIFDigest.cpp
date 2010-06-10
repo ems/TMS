@@ -233,6 +233,8 @@ int SetupMIFLINES(MIFPASSEDDATADef *pMIFPASSEDDATA, MIFLINESDef *pMIFLINES)
           {
             Long = dValue1;
             Lat  = dValue2;
+//            Long = dValue2;
+//            Lat  = dValue1;
           }
 //
 //  Save Lat and Long to the data structure

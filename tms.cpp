@@ -5,10 +5,12 @@
 //
 //  TMS.cpp : Defines the class behaviors for the application.
 //
-
 #include "stdafx.h"
 #include <afxole.h>
 #include <afxsock.h>
+
+#pragma warning (disable: 4786)
+
 extern "C" {
 #define EXTERN
 #include "TMSHeader.h"
@@ -111,6 +113,8 @@ BEGIN_MESSAGE_MAP(CTMSApp, CWinApp)
 	ON_COMMAND(ID_EDIT_INSERT_SD_CONNECTION, OnEditInsertSdConnection)
 	ON_COMMAND(ID_COMMANDS_OPTIMALHOOK_BLOCKS, OnCommandsOptimalhookBlocks)
 	ON_COMMAND(ID_EDIT_CREATEPLACEHOLDERRUNS, OnEditCreateplaceholderruns)
+	ON_COMMAND(ID_EDIT_UPDATE_RANGE_TRIPNUMBERS, OnEditUpdateRangeTripnumbers)
+	ON_COMMAND(ID_COMMANDS_FORCE_POPI, OnCommandsForcePopi)
 	//}}AFX_MSG_MAP
 	// Standard file based document commands
 	ON_COMMAND(ID_FILE_NEW, CWinApp::OnFileNew)
@@ -146,7 +150,7 @@ BOOL CTMSApp::InitInstance()
 
   m_bWorkrulesChanged = FALSE;
 //
-//  Initialize the common control library
+//  Initialize the common control library 
 //
   InitCommonControls();
 //
@@ -319,6 +323,19 @@ BOOL CTMSApp::InitInstance()
     m_DeleteAssignment = CNZDelAssignment;
     m_AddDriver = CNZAddDriver;
     m_AddBus = CNZAddBus;
+    s = GetProfileString("Daily Operations", "PostAddress");
+    if(s == "")
+    {
+      s = "http://tin-sql/rtt/realtime/utility/External.asmx";
+    }
+    strcpy(szPostAddress, s);
+    s = GetProfileString("Daily Operations", "HostAddress");
+    if(s == "")
+    {
+      s = "tin-sql";
+    }
+    strcpy(szHostAddress, s);
+
   }
 //
 //  Don't bother with MapInfo initialization if the registry
@@ -768,6 +785,17 @@ BOOL CTMSApp::InitInstance()
   s.LoadString(AFX_IDS_APP_TITLE);
   m_pMainWnd->SetWindowText(s);
 //
+//  Allocate space for m_pRunRecordData
+//
+  m_maxRunRecords = 200;
+  m_pRunRecordData = (RunRecordDef *)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, sizeof(RunRecordDef) * m_maxRunRecords); 
+  if(m_pRunRecordData == NULL)
+  {
+    AllocationError(__FILE__, __LINE__, FALSE);
+    return FALSE;
+  }
+
+//
 //  Display the greeting dialog
 //
   while(TRUE)
@@ -836,17 +864,6 @@ BOOL CTMSApp::InitInstance()
     AllocationError(__FILE__, __LINE__, FALSE);
     return FALSE;
   }
-//
-//  Allocate space for m_pRunRecordData
-//
-  m_maxRunRecords = 200;
-  m_pRunRecordData = (RunRecordDef *)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, sizeof(RunRecordDef) * m_maxRunRecords); 
-  if(m_pRunRecordData == NULL)
-  {
-    AllocationError(__FILE__, __LINE__, FALSE);
-    return FALSE;
-  }
-
 //
 //  Set pointers to NULL for structures to be allocated later
 //

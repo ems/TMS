@@ -160,7 +160,9 @@ BOOL CTripGraph::OnInitDialog()
   {
     m_numPatterns[nI] = 0;
     if(ROUTES.DIRECTIONSrecordID[nI] == NO_RECORD)
+    {
       continue;
+    }
     PATTERNSKey2.ROUTESrecordID = m_pDI->fileInfo.routeRecordID;
     PATTERNSKey2.SERVICESrecordID = m_pDI->fileInfo.serviceRecordID;
     PATTERNSKey2.directionIndex = nI;
@@ -180,7 +182,9 @@ BOOL CTripGraph::OnInitDialog()
         {
           m_PATTERNDATA[nI][nJ].flags = TRIPGRAPH_FLAG_PATTERNACTIVE;
           if(previousPATTERNNAMESrecordID != NO_RECORD)
+          {
             nJ++;
+          }
           previousPATTERNNAMESrecordID = PATTERNS.PATTERNNAMESrecordID;
           m_PATTERNDATA[nI][nJ].numSeqences = 0;
           m_PATTERNDATA[nI][nJ].PATTERNNAMESrecordID = PATTERNS.PATTERNNAMESrecordID;
@@ -213,7 +217,9 @@ BOOL CTripGraph::OnInitDialog()
   for(nI = 0; nI < 2; nI++)
   {
     if(m_numPatterns[nI] == 0)
+    {
       break;
+    }
     pos = nI == 0 ? 0 : m_posMax - 1;
     lastFound = pos;
     for(nJ = 0; nJ < m_PATTERNDATA[nI][0].numSeqences; nJ++)
@@ -281,7 +287,9 @@ BOOL CTripGraph::OnInitDialog()
   for(nI = 0; nI < 2; nI++)
   {
     if(ROUTES.DIRECTIONSrecordID[nI] == NO_RECORD)
+    {
       break;
+    }
 //
 //  Get the earliest trip in this direction
 //
@@ -294,14 +302,20 @@ BOOL CTripGraph::OnInitDialog()
           TRIPS.ROUTESrecordID != m_pDI->fileInfo.routeRecordID ||
           TRIPS.SERVICESrecordID != m_pDI->fileInfo.serviceRecordID ||
           TRIPS.directionIndex != nI)
+    {
       break;
+    }
     GenerateTrip(TRIPS.ROUTESrecordID, TRIPS.SERVICESrecordID,
           TRIPS.directionIndex, TRIPS.PATTERNNAMESrecordID,
           TRIPS.timeAtMLP, GENERATETRIP_FLAG_DISPLAYERRORS, &m_GTResults);
     if(m_GTResults.firstNodeTime < m_earliestTime)
+    {
       m_earliestTime = m_GTResults.firstNodeTime;
+    }
     if(m_GTResults.lastNodeTime > m_latestTime)
+    {
       m_latestTime = m_GTResults.lastNodeTime;
+    }
 //
 //  Get the latest trip in this direction
 //
@@ -314,14 +328,20 @@ BOOL CTripGraph::OnInitDialog()
           TRIPS.ROUTESrecordID != m_pDI->fileInfo.routeRecordID ||
           TRIPS.SERVICESrecordID != m_pDI->fileInfo.serviceRecordID ||
           TRIPS.directionIndex != nI)
+    {
       break;
+    }
     GenerateTrip(TRIPS.ROUTESrecordID, TRIPS.SERVICESrecordID,
           TRIPS.directionIndex, TRIPS.PATTERNNAMESrecordID,
           TRIPS.timeAtMLP, GENERATETRIP_FLAG_DISPLAYERRORS, &m_GTResults);
     if(m_GTResults.firstNodeTime < m_earliestTime)
+    {
       m_earliestTime = m_GTResults.firstNodeTime;
+    }
     if(m_GTResults.lastNodeTime > m_latestTime)
+    {
       m_latestTime = m_GTResults.lastNodeTime;
+    }
   }
 //
 //  Round the earliest down to the previous hour
@@ -338,7 +358,9 @@ BOOL CTripGraph::OnInitDialog()
   {
     m_numTrips[nI] = 0;
     if(ROUTES.DIRECTIONSrecordID[nI] == NO_RECORD)
+    {
       break;
+    }
 //
 //  Loop through the trips
 //
@@ -409,7 +431,9 @@ BOOL CTripGraph::OnInitDialog()
 
   dc.GetTextMetrics(&tm);
   if(tm.tmAveCharWidth <= 0)
+  {
     tm.tmAveCharWidth = 4;
+  }
 //
 //  Set up the rest of the device context's properties
 //
@@ -495,9 +519,13 @@ void CTripGraph::OnPaint()
     strncpy(tempString, NODES.abbrName, NODES_ABBRNAME_LENGTH);
     trim(tempString, NODES_ABBRNAME_LENGTH);
     if(m_NODEDATA.sequence[0][nJ] != NO_RECORD && m_NODEDATA.sequence[1][nJ] != NO_RECORD)
+    {
       SetTextColor(hDC, RGB(0, 0, 0));
+    }
     else
+    {
       SetTextColor(hDC, m_NODEDATA.sequence[0][nJ] != NO_RECORD ? RGB(255, 0, 0) : RGB(0, 0, 255));
+    }
     DrawText(hDC, tempString, -1, &rcTemp, DT_LEFT | DT_TOP | DT_NOPREFIX);
     m_NODEDATA.yPos[nJ] = rcTemp.top + (m_CharHeight / 2); //(m_CharHeight / 2);
     rcTemp.top += spacing; //m_CharHeight;
@@ -608,7 +636,9 @@ void CTripGraph::OnPaint()
     {
       nK = m_TRIPGRAPH[nI][nJ].patternIndex;
       if(!(m_PATTERNDATA[nI][nK].flags & TRIPGRAPH_FLAG_PATTERNACTIVE))
+      {
         continue;
+      }
       if(nI == 0)
       {
         start = 0;
@@ -617,14 +647,18 @@ void CTripGraph::OnPaint()
           while(start < m_posMax)
           {
             if(m_PATTERNDATA[nI][nK].patternSequence[nL] == m_NODEDATA.sequence[nI][start])
+            {
               break;
+            }
             start++;
           }
           end = start + 1;
           while(end <= m_posMax)
           {
             if(m_PATTERNDATA[nI][nK].patternSequence[nL + 1] == m_NODEDATA.sequence[nI][end])
+            {
               break;
+            }
             end++;
           }
 //          if(end - start == 1)
@@ -653,14 +687,18 @@ void CTripGraph::OnPaint()
           while(start > 0)
           {
             if(m_PATTERNDATA[nI][nK].patternSequence[nL] == m_NODEDATA.sequence[nI][start])
+            {
               break;
+            }
             start--;
           }
           end = start - 1;
           while(end >= 0)
           {
             if(m_PATTERNDATA[nI][nK].patternSequence[nL + 1] == m_NODEDATA.sequence[nI][end])
+            {
               break;
+            }
             end--;
           }
 //          if(start - end == 1)
@@ -748,7 +786,9 @@ void CTripGraph::OnContextMenu(CWnd* pWnd, CPoint point)
     m_ContextMenu.LoadMenu(IDR_TRIPGRAPH_CONTEXT);
     CMenu* pMenu = m_ContextMenu.GetSubMenu(0);
     if(pMenu != NULL)
+    {
       pMenu->TrackPopupMenu(TPM_LEFTALIGN, point.x, point.y, pWnd, NULL);
+    }
     m_ContextMenu.DestroyMenu();
   }
 }
@@ -850,7 +890,9 @@ BOOL CTripGraph::SnapToTrip()
     }
   }
   if(position == NO_RECORD)
+  {
     return(FALSE);
+  }
 
   NODESKey0.recordID = m_NODEDATA.recordIDs[position];
   btrieve(B_GETEQUAL, TMS_NODES, &NODES, &NODESKey0, 0);
@@ -872,7 +914,9 @@ BOOL CTripGraph::SnapToTrip()
     }
   }
   if(position == NO_RECORD)
+  {
     return(FALSE);
+  }
 
   long timeOfDay = m_TIMEPERIOD.time[0] +
         (long)(((float)(m_LButtonPoint.x - m_TIMEPERIOD.xPos[0]) / m_TIMEPERIOD.interval) * 3600);

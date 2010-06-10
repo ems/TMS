@@ -205,6 +205,7 @@
 #define DATABASE_LASTUPDATEDATE         104
 #define ADDNODE_DESCRIPTION             104
 #define OPENDATABASE_LASTUPDATEDATE     104
+#define ADDROUTE_ALTERNATE              104
 #define BIDDING_DAY5                    105
 #define ADDROSTER_RUNTYPELIST           105
 #define ROSTERPARMS_DIFFSTART           105
@@ -790,6 +791,8 @@
 #define IDD_PAYROLLLAYOUT               443
 #define IDD_PLACEHOLDER                 445
 #define IDD_DIALOG2                     448
+#define IDD_CHANGETRIPNUMBERS           449
+#define IDD_FORCEPOPI                   450
 #define ID_FILE_PRINT_EX                500
 #define ID_THEME_DEFAULT                600
 #define ID_THEME_OFFICE_XP              601
@@ -2025,11 +2028,22 @@
 #define ADDROUTE_RGRP                   1675
 #define PAYROLLSELECTIONS_SHOWRUNDETAILS 1676
 #define PAYROLLSELECTIONS_CRYSTAL_TITLE 1677
+#define WORKRULES_DONTPAYSHUTTLETRIPS   1679
+#define TRIPNUMBERS_STARTAT             1680
+#define TRIPNUMBERS_INCREMENT           1681
 #define CC_DIRECTION_TEXT               1682
+#define ROSTERPARMS_STARTSAFTER         1682
 #define CC_LESSTHANTWO                  1683
+#define ROSTERPARMS_ENDSAFTER           1683
 #define CC_MORETHANFIVE                 1684
+#define FORCEPOPI_TOCLOSEST             1684
+#define FORCEPOPI_GARAGELIST            1685
+#define FORCEPOPI_TOGARAGE              1686
 #define FINDCUSTOMER_TEXT               1687
+#define ADDPATTERN_FROMTEXT             1687
+#define ADDPATTERN_TOTEXT               1688
 #define FINDCUSTOMER_LIST               1689
+#define IDSORT                          1689
 #define CC_NATIMEDIFFERENCE             1691
 #define CC_NAATTENTION                  1692
 #define CC_NASPEEDING                   1693
@@ -2886,6 +2900,7 @@
 #define ERROR_371                       20371
 #define ERROR_372                       20372
 #define ERROR_373                       20373
+#define ERROR_374                       20374
 #define ID_BACK                         22772
 #define ID_FORWARD                      22773
 #define ID_UP                           22774
@@ -3613,6 +3628,8 @@
 #define DAILYOPSOWM_INCLUDEHOURS        32980
 #define DAILYOPSOWM_ASSIGNPAYCODE       32981
 #define ID_EDIT_CREATEPLACEHOLDERRUNS   32982
+#define ID_EDIT_UPDATE_RANGE_TRIPNUMBERS 32983
+#define ID_COMMANDS_FORCE_POPI          32984
 #define ID_GFX_SMALLICON                50000
 #define ID_GFX_LARGEICON                50001
 #define ID_GFX_RENAMEITEM               50002
@@ -3649,9 +3666,9 @@
 #ifdef APSTUDIO_INVOKED
 #ifndef APSTUDIO_READONLY_SYMBOLS
 #define _APS_3D_CONTROLS                     1
-#define _APS_NEXT_RESOURCE_VALUE        449
-#define _APS_NEXT_COMMAND_VALUE         32983
-#define _APS_NEXT_CONTROL_VALUE         1679
+#define _APS_NEXT_RESOURCE_VALUE        451
+#define _APS_NEXT_COMMAND_VALUE         32985
+#define _APS_NEXT_CONTROL_VALUE         1690
 #define _APS_NEXT_SYMED_VALUE           115
 #endif
 #endif

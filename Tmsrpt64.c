@@ -32,6 +32,10 @@ BOOL FAR TMSRPT64(TMSRPTPassedDataDef *pPassedData)
 //
   while(fgets(szarString, sizeof(szarString), fp))
   {
+    if(strcmp(szarString, "") == 0)
+    {
+      continue;
+    }
     strcpy(tempString, strtok(szarString, "\t\n"));
     recID = atol(tempString);
     strcpy(tempString, strtok(NULL, "\t\n"));

@@ -356,7 +356,7 @@ BOOL CALLBACK BLOCKSUMMARYMsgProc(HWND hWndDlg, UINT Message, WPARAM wParam, LPA
           assignedToNODESrecordID = bFirst ? NO_RECORD : NODES.recordID;
           TRIPSKey2.assignedToNODESrecordID = assignedToNODESrecordID;
           TRIPSKey2.RGRPROUTESrecordID = ROUTES.recordID;
-          TRIPSKey2.SGRPSERVICESrecordID = pDI->fileInfo.serviceRecordID;
+          TRIPSKey2.SGRPSERVICESrecordID = m_ServiceRecordID;
           TRIPSKey2.blockNumber = 1;
           TRIPSKey2.blockSequence = NO_TIME;
           rcode2 = btrieve(B_GETGREATEROREQUAL, TMS_TRIPS, &TRIPS, &TRIPSKey2, 2);
@@ -370,7 +370,7 @@ BOOL CALLBACK BLOCKSUMMARYMsgProc(HWND hWndDlg, UINT Message, WPARAM wParam, LPA
           while(rcode2 == 0 &&
                 pTRIPSChunk->assignedToNODESrecordID == assignedToNODESrecordID &&
                 pTRIPSChunk->RGRPROUTESrecordID == ROUTES.recordID &&
-                pTRIPSChunk->SGRPSERVICESrecordID == pDI->fileInfo.serviceRecordID &&
+                pTRIPSChunk->SGRPSERVICESrecordID == m_ServiceRecordID &&
                 pTRIPSChunk->blockNumber == blockNumber)
           {
             numBlocks++;

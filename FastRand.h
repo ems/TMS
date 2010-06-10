@@ -40,7 +40,7 @@ public:
 		return (SEED_X<<16) + (SEED_Y&65535);
 	}
 
-	unsigned int operator()( const unsigned n ) { return rand() % n; }
+	unsigned int operator()( const unsigned n ) { return (unsigned int)(drand() * n); }
 	
 	double drand()
 	{

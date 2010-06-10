@@ -288,35 +288,53 @@ char *Tchar(long time)
   int    am, nextDay = FALSE;
 
   if(time == NO_TIME)
+  {
     strcpy(szTime, "");
+  }
   else
   {
     if(time < 0)
+    {
       time += 86400L;
+    }
     hour = time / 3600;
     if(hour >= 24)
+    {
       nextDay = TRUE;
+    }
     hour %= 24;
     min = (time % 3600) / 60;
     if(timeFormat == PREFERENCES_APX)
     {
       if(hour < 12)
+      {
         am = TRUE;
+      }
       else
       {
         if(hour != 12)
+        {
           hour -= 12;
+        }
         am = FALSE;
       }
       if(hour == 0)
+      {
         hour = 12;
+      }
       sprintf(szTime, "%2ld%02ld%c", hour, min, nextDay ? 'X' : am ? 'A' : 'P' );
     }
     else
     {
       if(nextDay && !m_bWrapTime)
+      {
         hour += 24;
+      }
       sprintf(szTime, "%02ld%02ld", hour, min);
+    }
+    if(time % 60 != 0)
+    {
+      strcat(szTime, "+");
     }
   }
   return &szTime[0];

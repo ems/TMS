@@ -283,6 +283,17 @@ int SetUpReliefPoints(HWND hWnd, PDISPLAYINFO pDI,
       bDidNext = FALSE;
       for(nK = 0; nK < numNodes; nK++)
       {
+/*
+JERUSALEM
+//
+//  Don't set out cut points on this trip if it pulls out or pulls in
+//
+        if(pTRIPSChunk->POGNODESrecordID != NO_RECORD ||
+              pTRIPSChunk->PIGNODESrecordID != NO_RECORD)
+        {
+          break;
+        }
+*/
 //
 //  Skip through if we've already done the next node
 //
@@ -324,6 +335,16 @@ int SetUpReliefPoints(HWND hWnd, PDISPLAYINFO pDI,
         {
           continue;
         }
+/*
+JERUSALEM
+//
+//  Don't cut at the first timepoint of a trip
+//
+        if(thisTime == GTResults.firstNodeTime)
+        {
+          continue;
+        }
+*/
 //
 //  Get rid of identical relief times
 //

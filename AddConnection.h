@@ -73,6 +73,7 @@ protected:
   CButton*   pButtonTRAVELTIME;
   CButton*   pButtonDEADHEADTIME;
   CButton*   pButtonEQUIV;
+  CButton*   pButtonAVLEQUIVALENCE;
   CButton*   pButtonNA;
   CButton*   pButtonCC;
   CComboBox* pComboBoxCOMMENTCODE;

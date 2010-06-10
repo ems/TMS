@@ -5,11 +5,11 @@
 template <typename S>
 inline S trim( const S &s )
 {
-	register S::const_iterator nsBegin = s.begin(), cEnd = s.end();
+	register typename S::const_iterator nsBegin = s.begin(), cEnd = s.end();
 	while( nsBegin != cEnd && isspace(*nsBegin) )
 		++nsBegin;
 
-	register S::const_iterator nsEnd = cEnd;
+	register typename S::const_iterator nsEnd = cEnd;
 	while( nsEnd != nsBegin && isspace(*(nsEnd-1)) )
 		--nsEnd;
 
@@ -23,18 +23,29 @@ inline S trim( const S &s )
 }
 
 template <typename S>
-inline void trimInPlace( S &s )
+inline S &trimInPlace( S &s )
 {
-	register S::iterator nsBegin = s.begin(), cEnd = s.end();
+	register typename S::iterator nsBegin = s.begin(), cEnd = s.end();
 	while( nsBegin != cEnd && isspace(*nsBegin) )
 		++nsBegin;
 
-	register S::iterator nsEnd = cEnd;
+	register typename S::iterator nsEnd = cEnd;
 	while( nsEnd != nsBegin && isspace(*(nsEnd-1)) )
 		--nsEnd;
 
 	if( nsEnd != cEnd )				s.erase( nsEnd, s.end() );
 	if( nsBegin != s.begin() )		s.erase( s.begin(), nsBegin );
+
+	return s;
+}
+
+template <typename S>
+inline void trimQuotesInPlace( S &s )
+{
+	trimInPlace( s );
+	const size_t len = s.size();
+	if( len > 1 && (s[0] == '"' || s[0] == '\'') && s[len-1] == s[0] )
+		s = s.substr( 1, len-2 );
 }
 
 #endif // StrTrim_H

@@ -140,8 +140,16 @@ long RosterCoster(int firstIndex, int firstService, int secondIndex, int secondS
     return NO_RECORD;
 
   // Check if this is a night run and the following day must be a day off.
-  if( r1->offTime > ROSTERPARMS.nightWorkAfter && (ROSTERPARMS.flags & ROSTERPARMS_FLAG_OFFDAYMUSTFOLLOW) != 0 )
-	  return NO_RECORD;
+  if(ROSTERPARMS.flags & ROSTERPARMS_FLAG_STARTSAFTER)
+  {
+    if( r1->onTime > ROSTERPARMS.nightWorkAfter && (ROSTERPARMS.flags & ROSTERPARMS_FLAG_OFFDAYMUSTFOLLOW) != 0 )
+	    return NO_RECORD;
+  }
+  else
+  {
+    if( r1->offTime > ROSTERPARMS.nightWorkAfter && (ROSTERPARMS.flags & ROSTERPARMS_FLAG_OFFDAYMUSTFOLLOW) != 0 )
+	    return NO_RECORD;
+  }
 
   // Penalize for differences in onTime.
   cost = LABS(r1->onTime - r2->onTime);

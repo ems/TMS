@@ -158,10 +158,11 @@ EXTERN RUNTYPEDef RUNTYPE[NUMRUNTYPES][NUMRUNTYPESLOTS];  // 408 * 6 * 15 = 3672
 #define PAYWHEN_ABCDFLAG    (1<<3)
 #define PAYWHEN_MANIPULATE  (1<<4)
 
-#define PAYHOW_ACTUAL        0
-#define PAYHOW_FLAT         (1<<0)
-#define PAYHOW_PERCENTAGE   (1<<1)
-#define PAYHOW_STAGGERED    (1<<2)
+#define PAYHOW_ACTUAL          0
+#define PAYHOW_FLAT           (1<<0)
+#define PAYHOW_PERCENTAGE     (1<<1)
+#define PAYHOW_STAGGERED      (1<<2)
+#define PAYHOW_DONTPAYSHUTTLE (1<<3)
 
 #define PREMIUMFLAGS_TIMECOUNTSINOT              (1<<0)
 #define PREMIUMFLAGS_TRAVELTIMEPREMIUM           (1<<1)
@@ -192,6 +193,7 @@ typedef struct PREMIUMStruct
 //                            = PAYHOW_PERCENTAGE- Pay at a specified percentage 
 //                            = PAYHOW_STAGGERED - Pay at a staggered rate when less than the
 //                                                 specified minutes, and "actual" thereafer
+//                            = PAYHOW_DONTPAYSHUTTLE - Don't pay for trips on employee shuttles
   long  payHowMinutes;
   float payHowPercent;
   long  ROUTESrecordID;            // = NO_RECORD if not applicable
@@ -460,6 +462,7 @@ EXTERN long m_GlobalRunNumber;
 #define ROSTERPARMS_FLAG_PREFEREXTRASONWEEKENDS  0x0080
 #define ROSTERPARMS_FLAG_EQUALIZEWORK            0x0100
 #define ROSTERPARMS_FLAG_OFFDAYMUSTFOLLOW        0x0200
+#define ROSTERPARMS_FLAG_STARTSAFTER             0x0400
 
 typedef struct ROSTERPARMSStruct
 {

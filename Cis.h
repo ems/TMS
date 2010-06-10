@@ -19,6 +19,8 @@ extern "C"
 #include "TMSHeader.h"
 }
 
+#include "multi_cmp.h"
+#include "hash_buf.h"
 #include <string.h>
 #include <fstream>
 #include <limits.h>
@@ -113,7 +115,10 @@ public:
 		return *this;
 	}
 
-	size_t hash() const { return (from << 3) ^ (to << 2) ^ (t<<1) ^ service; }
+	size_t hash() const
+	{
+		return multi_hash( from, to, t, service );
+	}
 
 private:
 	long	from, to, service;
@@ -549,16 +554,17 @@ public:
 		return (CIScEvent *)(arcToParent ? (arcToParent->from == this ? arcToParent->to : arcToParent->from) : NULL);
 	}
 
-	int	cmpRoute( const CIScEvent &s ) const
+	int	cmp( const CIScEvent &s ) const
 	{
-		const long d = (long)(s.route ? s.route->getID() : -1L) - (long)(route ? route->getID() : -1L);
-		return d < 0 ? -1 : d > 0 ? 1 : 0;
+		return MC::multi_cmp(	t, MC::less, s.t,
+								(long)(route ? route->getID() : -1L), MC::less, (long)(s.route ? s.route->getID() : -1L) );
 	}
-	bool operator< ( const CIScEvent &s ) const { return t < s.t ? true : s.t < t ? false : cmpRoute(s) <  0; }
-	bool operator<=( const CIScEvent &s ) const { return t < s.t ? true : s.t < t ? false : cmpRoute(s) <= 0; }
-	bool operator==( const CIScEvent &s ) const { return t == s.t && cmpRoute(s) == 0; }
-	bool operator>=( const CIScEvent &s ) const { return t > s.t ? true : s.t < t ? false : cmpRoute(s) >= 0; }
-	bool operator> ( const CIScEvent &s ) const { return t > s.t ? true : s.t < t ? false : cmpRoute(s) >  0; }
+	bool	operator< ( const CIScEvent &s ) const { return cmp(s) <  0; }
+	bool	operator<=( const CIScEvent &s ) const { return cmp(s) <= 0; }
+	bool	operator==( const CIScEvent &s ) const { return cmp(s) == 0; }
+	bool	operator!=( const CIScEvent &s ) const { return cmp(s) != 0; }
+	bool	operator>=( const CIScEvent &s ) const { return cmp(s) >= 0; }
+	bool	operator> ( const CIScEvent &s ) const { return cmp(s) >  0; }
 
 	tod_t		t;					// time of this event.
 
@@ -853,6 +859,37 @@ public:
 	TiXmlDocument	*toXmlDoc() const;
 };
 
+struct CISdriverPlanKey
+{
+	CISdriverPlanKey( const ident_t aFromNode, const ident_t aToNode, const tod_t aT, const bool aPlanLeave, const ident_t aIdService )
+		: fromNode(aFromNode), toNode(aToNode), t(aT), planLeave(aPlanLeave), idService(aIdService) {}
+
+	ident_t	fromNode, toNode;
+	tod_t	t;
+	bool	planLeave;
+	ident_t	idService;
+
+	bool	operator==( const CISdriverPlanKey &dpk ) const
+	{
+		return
+			fromNode	== dpk.fromNode &&
+			toNode		== dpk.toNode &&
+			t			== dpk.t &&
+			planLeave	== dpk.planLeave &&
+			idService	== dpk.idService;
+	}
+
+	size_t	hash() const { return multi_hash(fromNode, toNode, t, planLeave, idService); }
+};
+struct CISdriverPlanData
+{
+	CISdriverPlanData( const tod_t aStartTime = -25*60*60, const tod_t aEndTime = 0, const tod_t aDwellTime = 0 )
+		: startTime(aStartTime), endTime(aEndTime), dwellTime(aDwellTime) {}
+	tod_t startTime, endTime, dwellTime;
+};
+
+typedef HashObj< CISdriverPlanKey, CISdriverPlanData >	CISdriverPlanCache;
+
 class CIS
 {
 public:
@@ -972,7 +1009,8 @@ public:
 			services.insert( aID, service );
 		}
 	}
-	void	addVehicle( const ident_t aID, const char *aName, const int aIsSurface = 1, const int aIsAccessible = 0, const int aIsBicycle = 0 )
+	void	addVehicle( const ident_t aID, const char *aName,
+				const bool aIsSurface = true, const bool aIsAccessible = false, const bool aIsBicycle = false )
 	{
 		if( !vehicles.contains(aID) )
 		{
@@ -1225,6 +1263,8 @@ public:
 
 	CISrouteTimesReply	*getRouteTimesReply( const ident_t serviceID, const ident_t routeDirectionID );
 	void				getRouteStopTimes( TripPlanRequestReply::TimeOfDayVector &todv, const ident_t serviceID, const ident_t routeDirectionID, const ident_t locationID );
+
+	CISdriverPlanCache	driverPlanCache;
 
 private:
 	ServiceCalendar	*serviceCalendar;

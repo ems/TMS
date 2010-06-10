@@ -16,6 +16,7 @@ extern "C" {
 #include "CopyRoster.h"
 #include "CopyRuncut.h"
 #include "BlockPairs.h"
+#include "ForcePOPI.h"
 
 //
 //  ID_COMMANDS_NODE_FINDER
@@ -1101,6 +1102,57 @@ void CTMSApp::OnCommandsCutRuns()
       DI.fileInfo = pTD->fileInfo;
       if(DialogBoxParam(hInst, MAKEINTRESOURCE(IDD_ADDRUN),
             pTD->pane->m_hWnd, (DLGPROC)ADDRUNMsgProc, (LPARAM)&DI))
+      {
+        GetTMSData(pTD, GETTMSDATA_FLAG_CLEAR);
+      }
+    }
+  }
+
+  return;
+}
+
+//
+//  ID_COMMANDS_FORCE_POPI
+//
+
+void CTMSApp::OnCommandsForcePopi() 
+{
+  CMDIFrameWnd* pMDIFrameWnd = (CMDIFrameWnd *)m_pMainWnd->GetTopLevelFrame();
+
+  if(pMDIFrameWnd == NULL)
+  {
+    return;
+  }
+
+  CMDIChildWnd* pChild = pMDIFrameWnd->MDIGetActive();
+
+  if(pChild == NULL)
+  {
+    return;
+  }
+
+  HWND hActiveWindow = pChild->m_hWnd;
+  if(hActiveWindow)
+  {
+    long displayIndex = GetWindowLong(hActiveWindow, GWL_USERDATA);
+    TableDisplayDef *pTD = &m_TableDisplay[displayIndex];
+
+    if(pTD && pTD->F1)
+    {
+//
+//  Verify his rights
+//
+      if(!VerifyUserAccessRights(TMS_RUNS))
+      {
+        return;
+      }
+
+      DISPLAYINFO DI;
+
+      DI.fileInfo = pTD->fileInfo;
+      CForcePOPI dlg(pChild, &DI);
+  
+      if(dlg.DoModal())
       {
         GetTMSData(pTD, GETTMSDATA_FLAG_CLEAR);
       }

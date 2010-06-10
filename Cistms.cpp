@@ -1481,16 +1481,15 @@ char	*CISplanReliefConnect(	tod_t *pStartTime, tod_t *pEndTime,
 								const ident_t idService )
 {
 	static char *noDescriptionString = "No description requested.";
-
-	if( !cis )
-  {
-    MessageBeep(MB_ICONSTOP);
-    MessageBox(NULL, "Internal error: CIS Not initialized\nPlease contact Schedule Masters, Inc", TMS, MB_ICONSTOP | MB_OK);
-		abort();	// Must initialize trip planner before calling!!!
-  }
-
 	static	char	szTranslate[8192];
-
+		
+	if( !cis )
+	{
+		MessageBeep(MB_ICONSTOP);
+		MessageBox(NULL, "Internal error: CIS Not initialized\nPlease contact Schedule Masters, Inc", TMS, MB_ICONSTOP | MB_OK);
+		abort();	// Must initialize trip planner before calling!!!
+	}
+	
 	if( t == NO_TIME || fromNode <= 0 || toNode <= 0 )
 	{
 		*pStartTime = -25 * 60 * 60;
@@ -1499,11 +1498,23 @@ char	*CISplanReliefConnect(	tod_t *pStartTime, tod_t *pEndTime,
 		return "";
 	}
 	// Translating the trips into readable format is expensive, and should avoided if not necessary.
-
-  ident_t fromNodeID = fromNode;
-  ident_t toNodeID = toNode;
 	
-	CISmessageMap	&mm = *getDriversMessageMap();
+	ident_t fromNodeID = fromNode;
+	ident_t toNodeID = toNode;
+	
+	// Check the cache.
+	if( description <= 0 )
+	{
+		CISdriverPlanCache::iterator dpe = cis->driverPlanCache.find( CISdriverPlanKey(fromNode, toNode, t, planLeave != 0, idService) );
+		if( dpe != cis->driverPlanCache.end() )
+		{
+			const	CISdriverPlanData	&data = dpe.data();
+			*pStartTime	= data.startTime;
+			*pEndTime	= data.endTime;
+			*pDwellTime	= data.dwellTime;
+			return noDescriptionString;
+		}
+	}
 	
 	// Plan the trip.
 	CISresultCollection	resultCollection(1);
@@ -1515,11 +1526,11 @@ char	*CISplanReliefConnect(	tod_t *pStartTime, tod_t *pEndTime,
 		*pEndTime = 25 * 60 * 60;
 		*pDwellTime = 2 * 25 * 60 * 60;
 		if( !description )
-			return "No description requested.";
+			return noDescriptionString;
 		else
 			return "Infeasible.";
 	}
-
+	
 	int bestIndex = 0;
 	tod_t bestTravel = (50 * 60 * 60);
 	tod_t thisTravel;
@@ -1541,11 +1552,15 @@ char	*CISplanReliefConnect(	tod_t *pStartTime, tod_t *pEndTime,
 	// Round down to the nearest minute.
 	*pStartTime	= roundDownToNearestMinute(resultCollection[bestIndex]->getLeaveTime());
 	*pEndTime	= roundDownToNearestMinute(resultCollection[bestIndex]->getArriveTime());
-  if(*pStartTime == *pEndTime)
-    *pDwellTime = 0;
-  else
+	if(*pStartTime == *pEndTime)
+		*pDwellTime = 0;
+	else
 		*pDwellTime	= roundDownToNearestMinute(resultCollection[bestIndex]->getDwellTime());
-
+	
+	// Add this entry to the cache.
+	cis->driverPlanCache.insert(CISdriverPlanKey(fromNode, toNode, t, planLeave != 0, idService),
+								CISdriverPlanData(*pStartTime, *pEndTime, *pDwellTime) );
+	
 	if( description <= 0 )
 		return noDescriptionString;
 	
@@ -1555,6 +1570,7 @@ char	*CISplanReliefConnect(	tod_t *pStartTime, tod_t *pEndTime,
 	char	szPlan[8192]; szPlan[0] = 0;
 	
 	// First, translate the trip plan into the interval format.
+	CISmessageMap	&mm = *getDriversMessageMap();	
 	resultCollection[bestIndex]->format( szPlan, sizeof(szPlan), NULL, 0, mm );
 	
 	// Second, translate from the internal format into a readable format.

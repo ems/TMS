@@ -526,9 +526,11 @@ BOOL CALLBACK ADDROSTERMsgProc(HWND hWndDlg, UINT Message, WPARAM wParam, LPARAM
                       m_pRRLIST[serviceIndex].pData[nL].runNumber = runNumber;
                       m_pRRLIST[serviceIndex].pData[nL].runtype = selectedRuntype;
                       m_pRRLIST[serviceIndex].pData[nL].RGRPROUTESrecordID = NO_RECORD;
-                      m_pRRLIST[serviceIndex].pData[nL].onTime = PROPOSEDRUN.piece[0].fromTime;
+                      m_pRRLIST[serviceIndex].pData[nL].onTime = PROPOSEDRUN.piece[0].fromTime - 
+                            COST.PIECECOST[0].reportTime - COST.TRAVEL[0].startTravelTime;
                       m_pRRLIST[serviceIndex].pData[nL].onNODESrecordID = PROPOSEDRUN.piece[0].fromNODESrecordID;
-                      m_pRRLIST[serviceIndex].pData[nL].offTime = PROPOSEDRUN.piece[pieceNumber - 1].toTime;
+                      m_pRRLIST[serviceIndex].pData[nL].offTime = PROPOSEDRUN.piece[pieceNumber - 1].toTime +
+                            COST.PIECECOST[nK].turninTime + COST.TRAVEL[nK].endTravelTime;
                       m_pRRLIST[serviceIndex].pData[nL].offNODESrecordID = PROPOSEDRUN.piece[pieceNumber - 1].toNODESrecordID;
                       m_pRRLIST[serviceIndex].pData[nL].payTime = COST.TOTAL.payTime;
                       m_pRRLIST[serviceIndex].pData[nL].flags = RTFLAGS_CREWONLY;
@@ -627,9 +629,11 @@ BOOL CALLBACK ADDROSTERMsgProc(HWND hWndDlg, UINT Message, WPARAM wParam, LPARAM
                       m_pRRLIST[serviceIndex].pData[nL].runNumber = runNumber;
                       m_pRRLIST[serviceIndex].pData[nL].runtype = selectedRuntype;
                       m_pRRLIST[serviceIndex].pData[nL].RGRPROUTESrecordID = RGRPROUTESrecordID;
-                      m_pRRLIST[serviceIndex].pData[nL].onTime = PROPOSEDRUN.piece[0].fromTime;
+                      m_pRRLIST[serviceIndex].pData[nL].onTime = PROPOSEDRUN.piece[0].fromTime -
+                            COST.PIECECOST[0].reportTime - COST.TRAVEL[0].startTravelTime;
                       m_pRRLIST[serviceIndex].pData[nL].onNODESrecordID = PROPOSEDRUN.piece[0].fromNODESrecordID;
-                      m_pRRLIST[serviceIndex].pData[nL].offTime = PROPOSEDRUN.piece[pieceNumber - 1].toTime;
+                      m_pRRLIST[serviceIndex].pData[nL].offTime = PROPOSEDRUN.piece[pieceNumber - 1].toTime +
+                            COST.PIECECOST[nK].turninTime + COST.TRAVEL[nK].endTravelTime;
                       m_pRRLIST[serviceIndex].pData[nL].offNODESrecordID = PROPOSEDRUN.piece[pieceNumber - 1].toNODESrecordID;
                       m_pRRLIST[serviceIndex].pData[nL].payTime = COST.TOTAL.payTime;
                       m_pRRLIST[serviceIndex].pData[nL].flags = 0;

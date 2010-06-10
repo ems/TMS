@@ -49,6 +49,8 @@ long GetPaidTravel(int, long);
 BOOL IsGarage(long);
 long GetGarageTravel(long, PROPOSEDRUNPIECESDef *, PREMIUMDef *, RUNTRIPDef *);
 void FillRUNTRIP(RUNTRIPDef *, PROPOSEDRUNDef *, int, BOOL);
+BOOL ValidateRuntype(long, int *, int *);
+
 
 long RunCoster(PROPOSEDRUNDef *pPR, long cutAsRuntype, COSTDef *pCOST)
 {
@@ -159,13 +161,17 @@ long RunCoster(PROPOSEDRUNDef *pPR, long cutAsRuntype, COSTDef *pCOST)
 //
   if(cutAsRuntype != NO_RUNTYPE && cutAsRuntype != UNCLASSIFIED_RUNTYPE)
   {
-    nType = (short int)LOWORD(cutAsRuntype);
-    nSlot = (short int)HIWORD(cutAsRuntype);
-
-    if(RUNTYPE[nType][nSlot].flags & RTFLAGS_PLACEHOLDER)
+    if(!ValidateRuntype(cutAsRuntype, &nType, &nSlot))
     {
-      pCOST->runtype = cutAsRuntype;
-      return(pCOST->runtype);
+      cutAsRuntype = UNCLASSIFIED_RUNTYPE;
+    }
+    else
+    {
+      if(RUNTYPE[nType][nSlot].flags & RTFLAGS_PLACEHOLDER)
+      {
+        pCOST->runtype = cutAsRuntype;
+        return(pCOST->runtype);
+      }
     }
   }
 //
@@ -353,10 +359,12 @@ long RunCoster(PROPOSEDRUNDef *pPR, long cutAsRuntype, COSTDef *pCOST)
 //
   if(pCOST->runtype != UNCLASSIFIED_RUNTYPE)
   {
-    nType = (short int)LOWORD(pCOST->runtype);
-    nSlot = (short int)HIWORD(pCOST->runtype);
+    if(!ValidateRuntype(pCOST->runtype , &nType, &nSlot))
+    {
+      pCOST->runtype  = UNCLASSIFIED_RUNTYPE;
+    }
   }
-  else
+  if(pCOST->runtype == UNCLASSIFIED_RUNTYPE)
   {
     nType = nSlot = NO_RECORD;  // We'd rather crash than have it point to the wrong thing
     LoadString(hInst, TEXT_092, runcosterReason, sizeof(runcosterReason));
@@ -814,11 +822,12 @@ long RunCoster(PROPOSEDRUNDef *pPR, long cutAsRuntype, COSTDef *pCOST)
       bOKToPayBC = TRUE;
       if((PREMIUM[nI].payWhen & PAYWHEN_ABCDFLAG) && pPR->numPieces == 2)
       {
-        if(NodesEquivalent(pPR->piece[0].fromNODESrecordID, pPR->piece[0].toNODESrecordID, &equivalentTravelTime) &&
-              NodesEquivalent(pPR->piece[1].fromNODESrecordID, pPR->piece[1].toNODESrecordID, &equivalentTravelTime))
-
+        if(NodesEquivalent(pPR->piece[0].fromNODESrecordID, pPR->piece[0].toNODESrecordID, &equivalentTravelTime))
         {
-          bOKToPayBC = FALSE;
+          if(NodesEquivalent(pPR->piece[1].fromNODESrecordID, pPR->piece[1].toNODESrecordID, &equivalentTravelTime))
+          {
+            bOKToPayBC = FALSE;
+          }
         }
       }
 //
@@ -846,6 +855,7 @@ long RunCoster(PROPOSEDRUNDef *pPR, long cutAsRuntype, COSTDef *pCOST)
               bestTime = NO_TIME;
               for(nL = 0; nL < numGaragesInGarageList; nL++)
               {
+                equivalentTravelTime = NO_RECORD;  // Means we're checking a travel connection
                 if(pPR->piece[nJ].toNODESrecordID != garageList[nL] &&
                       NodesEquivalent(pPR->piece[nJ].toNODESrecordID,
                             garageList[nL], &equivalentTravelTime))
@@ -1005,8 +1015,8 @@ long RunCoster(PROPOSEDRUNDef *pPR, long cutAsRuntype, COSTDef *pCOST)
             bestTime = bestTime1;
             dwellTime = dwellTime1;
           }
-          if(NodesEquivalent(startLocation,
-                pPR->piece[0].fromNODESrecordID, &equivalentTravelTime))
+          equivalentTravelTime = NO_RECORD;  // Means we're checking a travel connection
+          if(NodesEquivalent(startLocation, pPR->piece[0].fromNODESrecordID, &equivalentTravelTime))
           {
             dwellTime = 0;
             travelTime = equivalentTravelTime;
@@ -1206,9 +1216,11 @@ long RunCoster(PROPOSEDRUNDef *pPR, long cutAsRuntype, COSTDef *pCOST)
         bestTime = GetClosestGarage(flags, &RUNTRIP, &dwellTime, &endLocation, 
               pPR->piece[lastPiece].toNODESrecordID, pPR->piece[lastPiece].toTime, nI, nJ);
         if(bestTime == NO_TIME)
+        {
           bestTime = 0;
-        if(NodesEquivalent(endLocation,
-              pPR->piece[lastPiece].toNODESrecordID, &equivalentTravelTime))
+        }
+        equivalentTravelTime = NO_RECORD;  // Means we're checking a travel connection
+        if(NodesEquivalent(endLocation, pPR->piece[lastPiece].toNODESrecordID, &equivalentTravelTime))
         {
           dwellTime = 0;
           travelTime = equivalentTravelTime;
@@ -1281,11 +1293,16 @@ long RunCoster(PROPOSEDRUNDef *pPR, long cutAsRuntype, COSTDef *pCOST)
 //
         if(bDoIt)
         {
+          equivalentTravelTime = NO_RECORD;  // Means we're checking a travel connection
           if(NodesEquivalent(pPR->piece[lastPiece].toNODESrecordID,
                 GCTData.toNODESrecordID, &equivalentTravelTime))
+          {
             travelTime = equivalentTravelTime;
+          }
           else if(PREMIUM[nI].payTravelTime == WORKRULES_TIMEENTERED)
+          {
             travelTime = PREMIUM[nI].time;
+          }
           else if(PREMIUM[nI].payTravelTime == WORKRULES_ASINCONNECTIONS)
           {
             GCTData.fromNODESrecordID = pPR->piece[lastPiece].toNODESrecordID;
@@ -1323,16 +1340,20 @@ long RunCoster(PROPOSEDRUNDef *pPR, long cutAsRuntype, COSTDef *pCOST)
               }
             }
             else
+            {
               travelTime = GetDynamicTravelTime(FALSE, pPR->piece[lastPiece].toNODESrecordID,
                     GCTData.toNODESrecordID, RUNTRIP.to[lastPiece].SGRPSERVICESrecordID,
                     pPR->piece[lastPiece].toTime, &dwellTime);
+            }
             if(travelTime == NO_TIME &&
                   (PREMIUM[nI].flags & PREMIUMFLAGS_USECONNECTIONIFNODYNAMIC))
             {
               if(travelTime != NO_TIME)
               {
                 if(bUseDynamicTravels && !bUseCISPlan)
+                {
                   numTravelInstructions--;
+                }
               }
               GCTData.fromNODESrecordID = pPR->piece[lastPiece].toNODESrecordID;
               GCTData.fromROUTESrecordID = RUNTRIP.to[lastPiece].RGRPROUTESrecordID;
@@ -1381,7 +1402,9 @@ long RunCoster(PROPOSEDRUNDef *pPR, long cutAsRuntype, COSTDef *pCOST)
           paidTravel = GetPaidTravel(nI, travelTime);
           pCOST->PIECECOST[lastPiece].dwellTime += dwellTime;
           if(!(PREMIUM[nI].flags & PREMIUMFLAGS_TIMECOUNTSINOT))
+          {
             minutesThatDontCount += paidTravel;
+          }
         }
       }
 //
@@ -1880,18 +1903,21 @@ long RunCoster(PROPOSEDRUNDef *pPR, long cutAsRuntype, COSTDef *pCOST)
         currentSpanStart = SpanCheck[0].ATime;
         bGotMinLayover = TRUE;
         bJustContinued = TRUE;
-        for(nI = 0; nI < numEntries - 1; nI++)
+        for(nI = 0; nI < numEntries; nI++)
         {
           if(SpanCheck[nI].BTime < minLayNotBefore && RUNTYPE[nType][nSlot].minLayNotBefore != NO_TIME)
           {
             continue;
           }
-          if(RUNTYPE[nType][nSlot].minLayLabel[0] != '\0')
+          if(nI < numEntries - 1)
           {
-            if(SpanCheck[nI + 1].ALabel != RUNTYPE[nType][nSlot].minLayLabel[0] ||
-                  SpanCheck[nI].BLabel != RUNTYPE[nType][nSlot].minLayLabel[0])
+            if(RUNTYPE[nType][nSlot].minLayLabel[0] != '\0')
             {
-              continue;
+              if(SpanCheck[nI + 1].ALabel != RUNTYPE[nType][nSlot].minLayLabel[0] ||
+                    SpanCheck[nI].BLabel != RUNTYPE[nType][nSlot].minLayLabel[0])
+              {
+                continue;
+              }
             }
           }
           if(SpanCheck[nI].BTime - currentSpanStart > RUNTYPE[nType][nSlot].minLaySpan)
@@ -1901,7 +1927,7 @@ long RunCoster(PROPOSEDRUNDef *pPR, long cutAsRuntype, COSTDef *pCOST)
           }
           else
           {
-            if(nI <= numEntries -1)
+            if(nI < numEntries - 1)
             {
               if(SpanCheck[nI + 1].ATime - SpanCheck[nI].BTime >= RUNTYPE[nType][nSlot].minLayTime)
               {
@@ -1927,12 +1953,17 @@ long RunCoster(PROPOSEDRUNDef *pPR, long cutAsRuntype, COSTDef *pCOST)
 //
   for(nJ = 0; nJ < pPR->numPieces; nJ++)
   {
-    if(nJ == 0 && nJ == pPR->numPieces - 1)
+    if(nJ == 0)
     {
-      if(pCOST->TRAVEL[nJ].flags & TRAVEL_FLAGS_STARTPAID)
+      if(pCOST->TRAVEL[0].flags & TRAVEL_FLAGS_STARTPAID)
       {
-        pCOST->PIECECOST[nJ].premiumTime += pCOST->TRAVEL[nJ].startTravelTime;
+        pCOST->PIECECOST[0].premiumTime += pCOST->TRAVEL[0].startTravelTime;
       }
+      pCOST->PIECECOST[0].premiumTime += pCOST->TRAVEL[0].endTravelTime;
+    }
+    else if(nJ == pPR->numPieces - 1)
+    {
+      pCOST->PIECECOST[nJ].premiumTime += pCOST->TRAVEL[nJ].startTravelTime;
       if(pCOST->TRAVEL[nJ].flags & TRAVEL_FLAGS_ENDPAID)
       {
         pCOST->PIECECOST[nJ].premiumTime += pCOST->TRAVEL[nJ].endTravelTime;
@@ -2332,6 +2363,7 @@ long GetClosestGarage(long flags, RUNTRIPDef *pRT, long *pDwellTime,
         {
           if(bReverse)
           {
+            equivalentTravelTime = NO_RECORD;  // Means we're checking a travel connection
             if(NodesEquivalent(fromNode, *pClosestGarageRecordID, &equivalentTravelTime))
             {
               bestTime = equivalentTravelTime;
@@ -2339,8 +2371,7 @@ long GetClosestGarage(long flags, RUNTRIPDef *pRT, long *pDwellTime,
             else
             {
               CISplanReliefConnect(&startTime, &endTime, pDwellTime, 0, *pClosestGarageRecordID, 
-                    fromNode, fromTime, !bBeAtGarageBeforeTime,
-                    pRT->to[0].SGRPSERVICESrecordID);
+                    fromNode, fromTime, !bBeAtGarageBeforeTime, pRT->to[0].SGRPSERVICESrecordID);
               if(startTime == -25 * 60 * 60)
               {
                 bestTime = NO_TIME;
@@ -2353,6 +2384,7 @@ long GetClosestGarage(long flags, RUNTRIPDef *pRT, long *pDwellTime,
           }
           else
           {
+            equivalentTravelTime = NO_RECORD;  // Means we're checking a travel connection
             if(NodesEquivalent(fromNode, *pClosestGarageRecordID, &equivalentTravelTime))
             {
               bestTime = equivalentTravelTime;
@@ -2360,8 +2392,7 @@ long GetClosestGarage(long flags, RUNTRIPDef *pRT, long *pDwellTime,
             else
             {
               CISplanReliefConnect(&startTime, &endTime, pDwellTime, 0, fromNode,
-                    *pClosestGarageRecordID, fromTime, !bBeAtGarageBeforeTime,
-                    pRT->to[0].SGRPSERVICESrecordID);
+                    *pClosestGarageRecordID, fromTime, !bBeAtGarageBeforeTime, pRT->to[0].SGRPSERVICESrecordID);
               if(startTime == -25 * 60 * 60)
               {
                 bestTime = NO_TIME;
@@ -2521,7 +2552,10 @@ BOOL GetPieceTravel(BOOL bRecursive, int nPrem, int nPce, int nType, int nSlot,
     for(nI = 0; nI < numGaragesInGarageList; nI++)
     {
       if(BNode == garageList[nI])
+      {
         continue;
+      }
+      equivalentTravelTime = NO_RECORD;  // Means we're checking a travel connection
       if(NodesEquivalent(BNode, garageList[nI], &equivalentTravelTime))
       {
         intermediateNode = garageList[nI];
@@ -2683,15 +2717,23 @@ BOOL GetPieceTravel(BOOL bRecursive, int nPrem, int nPce, int nType, int nSlot,
           CISplanReliefConnect(&startTime, &endTime, pDwellTime, 0, BNode, CNode,
                 pPR->piece[nPce].toTime, TRUE, pRT->to[nPce].SGRPSERVICESrecordID);
           if(startTime == -25 * 60 * 60)
+          {
             travelTime[0] = NO_TIME;
+          }
           else
+          {
             travelTime[0] =  (endTime - startTime) + *pDwellTime;
+          }
           CISplanReliefConnect(&startTime, &endTime, pDwellTime, 0, BNode, CNode,
                 pPR->piece[nNxtPce].fromTime, FALSE, pRT->to[nPce].SGRPSERVICESrecordID);
           if(startTime == -25 * 60 * 60)
+          {
             travelTime[1] = NO_TIME;
+          }
           else
+          {
             travelTime[1] = ((endTime - startTime) + *pDwellTime);
+          }
         }
       }
 //
@@ -2732,7 +2774,9 @@ BOOL GetPieceTravel(BOOL bRecursive, int nPrem, int nPce, int nType, int nSlot,
               travelTime[nI] = GetConnectionTime(GCT_FLAG_TRAVELTIME, &GCTData, &distance);
             }
             if(bUseDynamicTravels && !bUseCISPlan)
+            {
               numTravelInstructions--;
+            }
           }
         }
       }
@@ -2848,6 +2892,7 @@ BOOL GetPieceTravel(BOOL bRecursive, int nPrem, int nPce, int nType, int nSlot,
 //  wasn't an equivalence between B and a Garage under BCDIRECT.  If there was,
 //  we would have set BToInt as the equivalentTravelTime earlier. 
 //
+    equivalentTravelTime = NO_RECORD;  // Means we're checking a travel connection
     if(BToInt != NO_TIME)
     {
       travelTime[0] = BToInt;
@@ -2902,9 +2947,13 @@ BOOL GetPieceTravel(BOOL bRecursive, int nPrem, int nPce, int nType, int nSlot,
                 BNode, intermediateNode, pPR->piece[nPce].toTime,
                 TRUE, pRT->from[nNxtPce].SGRPSERVICESrecordID);
           if(startTime == -25 * 60 * 60)
+          {
             travelTime[0] = NO_TIME;
+          }
           else
+          {
             travelTime[0] =  (endTime - startTime) + *pDwellTime;
+          }
         }
         else
         {
@@ -2920,7 +2969,9 @@ BOOL GetPieceTravel(BOOL bRecursive, int nPrem, int nPce, int nType, int nSlot,
           {
             travelTime[0] = GetConnectionTime(GCT_FLAG_TRAVELTIME, &GCTData, &distance);
             if(bUseDynamicTravels && !bUseCISPlan)
+            {
               numTravelInstructions--;
+            }
           }
         }
       }
@@ -2965,6 +3016,7 @@ BOOL GetPieceTravel(BOOL bRecursive, int nPrem, int nPce, int nType, int nSlot,
 //
 //  Are they equivalent?
 //
+    equivalentTravelTime = NO_RECORD;  // Means we're checking a travel connection
     if(NodesEquivalent(intermediateNode, CNode, &equivalentTravelTime))
     {
       travelTime[1] = equivalentTravelTime;
@@ -2989,7 +3041,9 @@ BOOL GetPieceTravel(BOOL bRecursive, int nPrem, int nPce, int nType, int nSlot,
 //  Int->C: Actual travel calculated as hard-wired time
 //
       if(PREMIUM[nPrem].payTravelTime == WORKRULES_TIMEENTERED)
+      {
         travelTime[1] = PREMIUM[nPrem].time;
+      }
       else
       {
 //
@@ -3004,8 +3058,11 @@ BOOL GetPieceTravel(BOOL bRecursive, int nPrem, int nPce, int nType, int nSlot,
 //
         else
         {
+          equivalentTravelTime = NO_RECORD;  // Means we're checking a travel connection
           if(NodesEquivalent(intermediateNode, CNode, &equivalentTravelTime))
+          {
             travelTime[1] = equivalentTravelTime;
+          }
           else
           {
             if(bUseCISPlan)
@@ -3014,9 +3071,13 @@ BOOL GetPieceTravel(BOOL bRecursive, int nPrem, int nPce, int nType, int nSlot,
                     intermediateNode, CNode, pPR->piece[nNxtPce].fromTime,
                     FALSE, pRT->from[nNxtPce].SGRPSERVICESrecordID);
               if(startTime == -25 * 60 * 60)
+              {
                 travelTime[1] = NO_TIME;
+              }
               else
+              {
                 travelTime[1] =  (endTime - startTime) + *pDwellTime;
+              }
             }
             else
             {
@@ -3033,7 +3094,9 @@ BOOL GetPieceTravel(BOOL bRecursive, int nPrem, int nPce, int nType, int nSlot,
               {
                 travelTime[1] = GetConnectionTime(GCT_FLAG_TRAVELTIME, &GCTData, &distance);
                 if(bUseDynamicTravels && !bUseCISPlan)
+                {
                   numTravelInstructions--;
+                }
               }
             }
           }
@@ -3111,9 +3174,13 @@ long GetPaidTravel(int nI, long travelTime)
   long paidTravel = 0;
   
   if(PREMIUM[nI].payHow == WORKRULES_PAYACTUAL)
+  {
     paidTravel = travelTime;
+  }
   else if(PREMIUM[nI].payHow == WORKRULES_PAYFLAT)
+  {
     paidTravel = PREMIUM[nI].payHowMinutes;
+  }
   else if(PREMIUM[nI].payHow == WORKRULES_PAYPERCENTAGE)
   {
     paidTravel = (long)(travelTime * PREMIUM[nI].payHowPercent);
@@ -3142,7 +3209,9 @@ BOOL IsGarage(long NODESrecordID)
   for(nI = 0; nI < numGaragesInGarageList; nI++)
   {
     if(garageList[nI] == NODESrecordID)
+    {
       return(TRUE);
+    }
   }
 
   return(FALSE);
@@ -3159,10 +3228,15 @@ long GetGarageTravel(long startLocation, PROPOSEDRUNPIECESDef *pPiece,
   long endTime;
   long equivalentTravelTime;
 
+  equivalentTravelTime = NO_RECORD;  // Means we're checking a travel connection
   if(NodesEquivalent(startLocation, pPiece->fromNODESrecordID, &equivalentTravelTime))
+  {
     travelTime = equivalentTravelTime;
+  }
   else if(pPremium->payTravelTime == WORKRULES_TIMEENTERED)
+  {
     travelTime = pPremium->time;
+  }
   else if(pPremium->payTravelTime == WORKRULES_ASINCONNECTIONS)
   {
     GCTData.fromROUTESrecordID = pRuntrip->from[0].RGRPROUTESrecordID;
@@ -3200,16 +3274,20 @@ long GetGarageTravel(long startLocation, PROPOSEDRUNPIECESDef *pPiece,
       }
     }
     else 
+    {
       travelTime = GetDynamicTravelTime(TRUE, startLocation,
             pPiece->fromNODESrecordID, pRuntrip->from[0].SGRPSERVICESrecordID,
             pPiece->fromTime, &dwellTime);
+    }
     if(travelTime == NO_TIME &&
          (pPremium->flags & PREMIUMFLAGS_USECONNECTIONIFNODYNAMIC))
     {
       if(travelTime != NO_TIME)
       {
         if(bUseDynamicTravels && !bUseCISPlan)
+        {
           numTravelInstructions--;
+        }
       }
       GCTData.fromROUTESrecordID = pRuntrip->from[0].RGRPROUTESrecordID;
       GCTData.fromSERVICESrecordID = pRuntrip->from[0].SGRPSERVICESrecordID;
@@ -3256,7 +3334,9 @@ void FillRUNTRIP(RUNTRIPDef *pRT, PROPOSEDRUNDef *pPR, int serviceIndex, BOOL bC
       }
     }
     if(bFound)
+    {
       pRT->from[nI].flags |= RCFLAGS_NODEGAR;
+    }
 //
 //  To trip: Node data - End node
 //
@@ -3270,7 +3350,9 @@ void FillRUNTRIP(RUNTRIPDef *pRT, PROPOSEDRUNDef *pPR, int serviceIndex, BOOL bC
       }
     }
     if(bFound)
+    {
       pRT->to[nI].flags |= RCFLAGS_NODEGAR;
+    }
   }
 //
 //  Crew only runs
@@ -3324,7 +3406,9 @@ void FillRUNTRIP(RUNTRIPDef *pRT, PROPOSEDRUNDef *pPR, int serviceIndex, BOOL bC
 //  From trip: Block POG
 //
     if(pRT->from[nI].blockPOGNODESrecordID != NO_RECORD)
+    {
       pRT->from[nI].flags |= RCFLAGS_PULLOUT;
+    }
     else
     {
       TRIPSKey2.assignedToNODESrecordID = pRT->from[nI].assignedToNODESrecordID;
@@ -3335,15 +3419,22 @@ void FillRUNTRIP(RUNTRIPDef *pRT, PROPOSEDRUNDef *pPR, int serviceIndex, BOOL bC
       rcode2 = btrieve(B_GETGREATER, TMS_TRIPS, &TRIPS, &TRIPSKey2, keyNumber);
       pTRIPSChunk = keyNumber == 2 ? &TRIPS.standard : &TRIPS.dropback;
       if(rcode2 != 0 || pTRIPSChunk->POGNODESrecordID == NO_RECORD)
+      {
         pRT->from[nI].blockPOGNODESrecordID = NO_RECORD;
+      }
       else
+      {
         pRT->from[nI].blockPOGNODESrecordID = pTRIPSChunk->POGNODESrecordID;
+      }
     }
 //
 //  From trip: Block PIG
 //
     if(pRT->from[nI].blockPIGNODESrecordID != NO_RECORD)
+    {
       pRT->from[nI].flags |= RCFLAGS_PULLIN;
+    }
+    else
     {
       TRIPSKey2.assignedToNODESrecordID = pRT->from[nI].assignedToNODESrecordID;
       TRIPSKey2.RGRPROUTESrecordID = pRT->from[nI].RGRPROUTESrecordID;
@@ -3352,22 +3443,30 @@ void FillRUNTRIP(RUNTRIPDef *pRT, PROPOSEDRUNDef *pPR, int serviceIndex, BOOL bC
       TRIPSKey2.blockSequence = NO_TIME;
       rcode2 = btrieve(B_GETLESSTHAN, TMS_TRIPS, &TRIPS, &TRIPSKey2, keyNumber);
       if(rcode2 != 0 || pTRIPSChunk->PIGNODESrecordID == NO_RECORD)
+      {
         pRT->from[nI].blockPIGNODESrecordID = NO_RECORD;
+      }
       else
+      {
         pRT->from[nI].blockPIGNODESrecordID = pTRIPSChunk->PIGNODESrecordID;
+      }
     }
 //
 //  From trip: Bustype data
 //
     if(TRIPS.BUSTYPESrecordID == NO_RECORD)
+    {
       pRT->from[nI].BUSTYPESrecordID = NO_RECORD;
+    }
     else
     {
       BUSTYPESKey0.recordID = TRIPS.BUSTYPESrecordID;
       btrieve(B_GETEQUAL, TMS_BUSTYPES, &BUSTYPES, &BUSTYPESKey0, 0);
       pRT->from[nI].BUSTYPESrecordID = BUSTYPES.recordID;
       if(BUSTYPES.flags & BUSTYPES_FLAG_ACCESSIBLE)
+      {
         pRT->from[nI].flags |= RCFLAGS_ACCESSIBLE;
+      }
     }
 //
 //  To trip
@@ -3388,7 +3487,9 @@ void FillRUNTRIP(RUNTRIPDef *pRT, PROPOSEDRUNDef *pPR, int serviceIndex, BOOL bC
 //  To trip: Block POG
 //
     if(pRT->to[nI].blockPOGNODESrecordID != NO_RECORD)
+    {
       pRT->to[nI].flags |= RCFLAGS_PULLOUT;
+    }
     else
     {
       TRIPSKey2.assignedToNODESrecordID = pRT->to[nI].assignedToNODESrecordID;
@@ -3398,15 +3499,22 @@ void FillRUNTRIP(RUNTRIPDef *pRT, PROPOSEDRUNDef *pPR, int serviceIndex, BOOL bC
       TRIPSKey2.blockSequence = NO_TIME;
       rcode2 = btrieve(B_GETGREATER, TMS_TRIPS, &TRIPS, &TRIPSKey2, keyNumber);
       if(rcode2 != 0 || pTRIPSChunk->POGNODESrecordID == NO_RECORD)
+      {
         pRT->to[nI].blockPOGNODESrecordID = NO_RECORD;
+      }
       else
+      {
         pRT->to[nI].blockPOGNODESrecordID = pTRIPSChunk->POGNODESrecordID;
+      }
     }
 //
 //  To trip: Block PIG
 //
     if(pRT->to[nI].blockPIGNODESrecordID != NO_RECORD)
+    {
       pRT->to[nI].flags |= RCFLAGS_PULLIN;
+    }
+    else
     {
       TRIPSKey2.assignedToNODESrecordID = pRT->to[nI].assignedToNODESrecordID;
       TRIPSKey2.RGRPROUTESrecordID = pRT->to[nI].RGRPROUTESrecordID;
@@ -3415,22 +3523,44 @@ void FillRUNTRIP(RUNTRIPDef *pRT, PROPOSEDRUNDef *pPR, int serviceIndex, BOOL bC
       TRIPSKey2.blockSequence = NO_TIME;
       rcode2 = btrieve(B_GETLESSTHAN, TMS_TRIPS, &TRIPS, &TRIPSKey2, keyNumber);
       if(rcode2 != 0 || TRIPS.standard.PIGNODESrecordID == NO_RECORD)
+      {
         pRT->to[nI].blockPIGNODESrecordID = NO_RECORD;
+      }
       else
+      {
         pRT->to[nI].blockPIGNODESrecordID = pTRIPSChunk->PIGNODESrecordID;
+      }
     }
 //
 //  To trip: Bustype data
 //
     if(TRIPS.BUSTYPESrecordID == NO_RECORD)
+    {
       pRT->to[nI].BUSTYPESrecordID = NO_RECORD;
+    }
     else
     {
       BUSTYPESKey0.recordID = TRIPS.BUSTYPESrecordID;
       btrieve(B_GETEQUAL, TMS_BUSTYPES, &BUSTYPES, &BUSTYPESKey0, 0);
       pRT->to[nI].BUSTYPESrecordID = BUSTYPES.recordID;
       if(BUSTYPES.flags & BUSTYPES_FLAG_ACCESSIBLE)
+      {
         pRT->to[nI].flags |= RCFLAGS_ACCESSIBLE;
+      }
     }
   }
 }
+
+BOOL ValidateRuntype(long cutAsRuntype, int *pnType, int *pnSlot)
+{
+  *pnType = (short int)LOWORD(cutAsRuntype);
+  *pnSlot = (short int)HIWORD(cutAsRuntype);
+  if(*pnType < 0 || *pnType >= NUMRUNTYPES || 
+        *pnSlot < 0 || *pnSlot >= NUMRUNTYPESLOTS)
+  {
+    return(FALSE);
+  }
+  
+  return(TRUE);
+}
+

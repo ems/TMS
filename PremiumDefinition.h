@@ -61,6 +61,7 @@ protected:
   CButton*   pButtonUSECONNIFNOSCHED;
 
   CButton*   pButtonPAIDTRAVEL;
+  CButton*   pButtonDONTPAYSHUTTLETRIPS;
   CEdit*     pEditPAYFLATMINUTES;
   CEdit*     pEditPERCENTOFACTUAL;
   CEdit*     pEditSTAGGEREDPERCENT;

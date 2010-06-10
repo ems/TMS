@@ -14,7 +14,7 @@ class CDailyOpsBP : public CDialog
 {
 // Construction
 public:
-	CDailyOpsBP(CWnd* pParent = NULL, BlockInfoDef* pBlockInfo = NULL, CTime dailyOpsDate = 0);   // standard constructor
+	CDailyOpsBP(CWnd* pParent = NULL, TripInfoDef* pTI = NULL, int numInTripInfo = 0);   // standard constructor
 
 // Dialog Data
 	//{{AFX_DATA(CDailyOpsBP)
@@ -36,10 +36,8 @@ protected:
   CListCtrl* pListCtrlTRIPLIST;
   CButton*   pButtonIDMODIFY;
   
-  BlockInfoDef* m_pBlockInfo;
-  TripInfoDef   m_TripInfo[500];
-  int m_numInTripInfo;
-  CTime m_DailyOpsDate;
+  TripInfoDef* m_pTI;
+  int          m_numInTI;
 
   void DisplayRow(int rowNumber);
 

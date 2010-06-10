@@ -14,6 +14,31 @@ typedef struct PATStruct
   BOOL bBusStop;
 } PATDef;
 
+typedef struct NODStruct
+{
+  long recordID;
+  char szAbbrName[NODES_ABBRNAME_LENGTH + 1];
+  char szDescription[NODES_DESCRIPTION_LENGTH + 1];
+} NODDef;
+
+int sort_AbbrName(const void *a, const void *b)
+{
+  NODDef *pa, *pb;
+  pa = (NODDef *)a;
+  pb = (NODDef *)b;
+
+  return(strcmp(pa->szAbbrName, pb->szAbbrName));
+}
+
+int sort_Description(const void *a, const void *b)
+{
+  NODDef *pa, *pb;
+  pa = (NODDef *)a;
+  pb = (NODDef *)b;
+
+  return(strcmp(pa->szDescription, pb->szDescription));
+}
+
 BOOL CALLBACK ADDPATTERNMsgProc(HWND hWndDlg, UINT Message, WPARAM wParam, LPARAM lParam)
 {
  static  PDISPLAYINFO pDI;
@@ -31,6 +56,9 @@ BOOL CALLBACK ADDPATTERNMsgProc(HWND hWndDlg, UINT Message, WPARAM wParam, LPARA
  static  HANDLE hCtlNA;
  static  HANDLE hCtlCC;
  static  HANDLE hCtlCOMMENTCODE;
+ static  HANDLE hCtlFROMTEXT;
+ static  HANDLE hCtlTOTEXT;
+ static  HANDLE hCtlSORT;
  static  BOOL   bDisplaySystemNodes;
  static  BOOL   bDisplayStops;
  static  BOOL   bShowAddress;
@@ -74,6 +102,12 @@ BOOL CALLBACK ADDPATTERNMsgProc(HWND hWndDlg, UINT Message, WPARAM wParam, LPARA
  long   *pBASEPatternNodeSeqs = NULL;
  BOOL   *pbBASEPatternNodeSeqsSelected = NULL;
 
+ static  NODDef *pNOD = NULL;
+ static  BOOL bSortingByAbbrName = TRUE;
+ char    dummy[256];
+ int     numRecords;
+
+
  switch(Message)
  {
 //
@@ -86,10 +120,27 @@ BOOL CALLBACK ADDPATTERNMsgProc(HWND hWndDlg, UINT Message, WPARAM wParam, LPARA
         SendMessage(hWndDlg, WM_COMMAND, MAKEWPARAM(IDCANCEL, 0), (LPARAM)0);
         break;
       }
+//
+//  Pattern allocation
+//
       numPAT = 0;
       maxPAT = 1024;
       pPAT = (PATDef *)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, sizeof(PATDef) * maxPAT); 
       if(pPAT == NULL)
+      {
+        AllocationError(__FILE__, __LINE__, FALSE);
+        SendMessage(hWndDlg, WM_COMMAND, MAKEWPARAM(IDCANCEL, 0), (LPARAM)0);
+        break;
+      }
+//
+//  Node allocation
+//
+//  Get the number of nodes in the table
+//
+      rcode2 = btrieve(B_STAT, TMS_NODES, &BSTAT, dummy, 0);
+      numRecords = BSTAT.numRecords;
+      pNOD = (NODDef *)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, sizeof(NODDef) * numRecords); 
+      if(pNOD == NULL)
       {
         AllocationError(__FILE__, __LINE__, FALSE);
         SendMessage(hWndDlg, WM_COMMAND, MAKEWPARAM(IDCANCEL, 0), (LPARAM)0);
@@ -112,6 +163,9 @@ BOOL CALLBACK ADDPATTERNMsgProc(HWND hWndDlg, UINT Message, WPARAM wParam, LPARA
      hCtlNA = GetDlgItem(hWndDlg, ADDPATTERN_NA);
      hCtlCC = GetDlgItem(hWndDlg, ADDPATTERN_CC);
      hCtlCOMMENTCODE = GetDlgItem(hWndDlg, ADDPATTERN_COMMENTCODE);
+     hCtlFROMTEXT = GetDlgItem(hWndDlg, ADDPATTERN_FROMTEXT);
+     hCtlTOTEXT = GetDlgItem(hWndDlg, ADDPATTERN_TOTEXT);
+     hCtlSORT = GetDlgItem(hWndDlg, IDSORT);
 //
 //  Comment codes combo box
 //
@@ -182,7 +236,9 @@ BOOL CALLBACK ADDPATTERNMsgProc(HWND hWndDlg, UINT Message, WPARAM wParam, LPARA
          {
            bFirst = FALSE;
            if(PATTERNS.COMMENTSrecordID == NO_RECORD)
+           {
              SendMessage(hCtlNA, BM_SETCHECK, (WPARAM)TRUE, (LPARAM)0);
+           }
            else
            {
              for(bFound = FALSE, nI = 0; nI < numComments; nI++)
@@ -194,8 +250,14 @@ BOOL CALLBACK ADDPATTERNMsgProc(HWND hWndDlg, UINT Message, WPARAM wParam, LPARA
                  break;
                }
              }
-             SendMessage(bFound ? hCtlCC : hCtlNA, BM_SETCHECK, (WPARAM)TRUE, (LPARAM)0);
            }
+           SendMessage(bFound ? hCtlCC : hCtlNA, BM_SETCHECK, (WPARAM)TRUE, (LPARAM)0);
+           strncpy(tempString, PATTERNS.fromText, PATTERNS_FROMTEXT_LENGTH);
+           trim(tempString, PATTERNS_FROMTEXT_LENGTH);
+           SendMessage(hCtlFROMTEXT, WM_SETTEXT, (WPARAM)0, (LONG)(LPSTR)tempString);
+           strncpy(tempString, PATTERNS.toText, PATTERNS_TOTEXT_LENGTH);
+           trim(tempString, PATTERNS_TOTEXT_LENGTH);
+           SendMessage(hCtlTOTEXT, WM_SETTEXT, (WPARAM)0, (LONG)(LPSTR)tempString);
          }
          NODESKey0.recordID = PATTERNS.NODESrecordID;
          btrieve(B_GETEQUAL, TMS_NODES, &NODES, &NODESKey0, 0);
@@ -218,9 +280,13 @@ BOOL CALLBACK ADDPATTERNMsgProc(HWND hWndDlg, UINT Message, WPARAM wParam, LPARA
          pPAT[numPAT].bMLP = PATTERNS.flags & PATTERNS_FLAG_MLP;
          pPAT[numPAT].bBusStop = PATTERNS.flags & PATTERNS_FLAG_BUSSTOP;
          if(pPAT[numPAT].bMLP)
+         {
            strcat(tempString, szMaxString);
+         }
          else if(pPAT[numPAT].bBusStop)
+         {
            strcat(tempString, szStopString);
+         }
          numPAT++;
          nI = (int)SendMessage(hCtlPATTERNNODES, LB_ADDSTRING, (WPARAM)NULL, (LONG)(LPSTR)tempString);
          SendMessage(hCtlPATTERNNODES, LB_SETITEMDATA, (WPARAM)nI, (LPARAM)nI);
@@ -254,7 +320,14 @@ BOOL CALLBACK ADDPATTERNMsgProc(HWND hWndDlg, UINT Message, WPARAM wParam, LPARA
        SendMessage(hCtlNA, BM_SETCHECK, (WPARAM)TRUE, (LPARAM)0);
      }
 //
-//  Defaulot to showing addresses
+//  No sort when not on BASE pattern
+//
+     if(!bDisplaySystemNodes)
+     {
+       EnableWindow(hCtlSORT, FALSE);
+     }
+//
+//  Default to showing addresses
 //
      bShowAddress = TRUE;
      SendMessage(hCtlSHOWADDRESS, BM_SETCHECK, (WPARAM)TRUE, (LPARAM)0);
@@ -327,6 +400,7 @@ BOOL CALLBACK ADDPATTERNMsgProc(HWND hWndDlg, UINT Message, WPARAM wParam, LPARA
        LoadString(hInst, TEXT_020, tempString, TEMPSTRING_LENGTH);
        SendMessage(hCtlALLTITLE, WM_SETTEXT, (WPARAM)0, (LONG)(LPSTR)tempString);
        rcode2 = btrieve(B_GETFIRST, TMS_NODES, &NODES, &NODESKey2, 2);
+       numNodes = 0;
        while(rcode2 == 0)
        {
          if((NODES.flags & NODES_FLAG_STOP) && !bDisplayStops)
@@ -334,9 +408,10 @@ BOOL CALLBACK ADDPATTERNMsgProc(HWND hWndDlg, UINT Message, WPARAM wParam, LPARA
          }
          else
          {
+           pNOD[numNodes].recordID = NODES.recordID;
            strncpy(tempString, NODES.abbrName, NODES_ABBRNAME_LENGTH);
            trim(tempString, NODES_ABBRNAME_LENGTH);
-           strcat(tempString, "\t");
+           strcpy(pNOD[numNodes].szAbbrName, tempString);
            if(bShowAddress)
            {
              strncpy(szarString, NODES.intersection, NODES_INTERSECTION_LENGTH);
@@ -347,12 +422,34 @@ BOOL CALLBACK ADDPATTERNMsgProc(HWND hWndDlg, UINT Message, WPARAM wParam, LPARA
              strncpy(szarString, NODES.description, NODES_DESCRIPTION_LENGTH);
              trim(szarString, NODES_DESCRIPTION_LENGTH);
            }
-           strcat(tempString, szarString);
-           nI = (int)SendMessage(hCtlALLNODES, LB_ADDSTRING, (WPARAM)0, (LONG)(LPSTR)tempString);
-           SendMessage(hCtlALLNODES, LB_SETITEMDATA, (WPARAM)nI, (LPARAM)NODES.recordID);
+           strcpy(pNOD[numNodes].szDescription, szarString);
            numNodes++;
          }
          rcode2 = btrieve(B_GETNEXT, TMS_NODES, &NODES, &NODESKey2, 2);
+       }
+       SendMessage(hCtlALLNODES, LB_RESETCONTENT, (WPARAM)0, (LPARAM)0);
+       for(nI = 0; nI < numNodes; nI++)
+       {
+         strcpy(tempString, pNOD[nI].szAbbrName);
+         strcat(tempString, "\t");
+         strcat(tempString, pNOD[nI].szDescription);
+         nJ = (int)SendMessage(hCtlALLNODES, LB_ADDSTRING, (WPARAM)0, (LONG)(LPSTR)tempString);
+         SendMessage(hCtlALLNODES, LB_SETITEMDATA, (WPARAM)nJ, (LPARAM)pNOD[nI].recordID);
+       }
+       if(bSortingByAbbrName)
+       {
+         if(bShowAddress)
+         {
+           SendMessage(hCtlSORT, WM_SETTEXT, (WPARAM)0, (LONG)(LPSTR)"Sort by Node Address");
+         }
+         else
+         {
+           SendMessage(hCtlSORT, WM_SETTEXT, (WPARAM)0, (LONG)(LPSTR)"Sort by Node Description");
+         }
+       }
+       else
+       {
+         SendMessage(hCtlSORT, WM_SETTEXT, (WPARAM)0, (LONG)(LPSTR)"Sort by Node Abbreviation");
        }
      }
 //
@@ -360,6 +457,7 @@ BOOL CALLBACK ADDPATTERNMsgProc(HWND hWndDlg, UINT Message, WPARAM wParam, LPARA
 //
      else
      {
+       numNodes = 0;
        LoadString(hInst, TEXT_021, tempString, TEMPSTRING_LENGTH);
        SendMessage(hCtlALLTITLE, WM_SETTEXT, 0, (LONG)(LPSTR)tempString);
        PATTERNSKey2.ROUTESrecordID = pDI->fileInfo.routeRecordID;
@@ -406,6 +504,44 @@ BOOL CALLBACK ADDPATTERNMsgProc(HWND hWndDlg, UINT Message, WPARAM wParam, LPARA
       switch(wmId)
       {
 //
+//  Sort
+//
+        case IDSORT:
+          bSortingByAbbrName = !bSortingByAbbrName;
+          if(bSortingByAbbrName)
+          {
+            qsort((void *)pNOD, numNodes, sizeof(NODDef), sort_AbbrName);
+          }
+          else
+          {
+            qsort((void *)pNOD, numNodes, sizeof(NODDef), sort_Description);
+          }
+          SendMessage(hCtlALLNODES, LB_RESETCONTENT, (WPARAM)0, (LPARAM)0);
+          for(nI = 0; nI < numNodes; nI++)
+          {
+            strcpy(tempString, pNOD[nI].szAbbrName);
+            strcat(tempString, "\t");
+            strcat(tempString, pNOD[nI].szDescription);
+            nJ = (int)SendMessage(hCtlALLNODES, LB_ADDSTRING, (WPARAM)0, (LONG)(LPSTR)tempString);
+            SendMessage(hCtlALLNODES, LB_SETITEMDATA, (WPARAM)nJ, (LPARAM)pNOD[nI].recordID);
+          }
+          if(bSortingByAbbrName)
+          {
+            if(bShowAddress)
+            {
+              SendMessage(hCtlSORT, WM_SETTEXT, (WPARAM)0, (LONG)(LPSTR)"Sort by Node Address");
+            }
+            else
+            {
+              SendMessage(hCtlSORT, WM_SETTEXT, (WPARAM)0, (LONG)(LPSTR)"Sort by Node Description");
+            }
+          }
+          else
+          {
+            SendMessage(hCtlSORT, WM_SETTEXT, (WPARAM)0, (LONG)(LPSTR)"Sort by Node Abbreviation");
+          }
+          break;
+//
 //  Show stops
 //
         case ADDPATTERN_SHOWSTOPS:
@@ -417,12 +553,74 @@ BOOL CALLBACK ADDPATTERNMsgProc(HWND hWndDlg, UINT Message, WPARAM wParam, LPARA
 //
         case ADDPATTERN_SHOWADDRESS:
           bShowAddress = TRUE;
-          SendMessage(hWndDlg, WM_USERSETUP, (WPARAM)0, (LPARAM)0);
+          if(bDisplaySystemNodes)
+          { 
+            if(bSortingByAbbrName)
+            {
+              if(bShowAddress)
+              {
+                SendMessage(hCtlSORT, WM_SETTEXT, (WPARAM)0, (LONG)(LPSTR)"Sort by Node Address");
+              }
+              else
+              {
+                SendMessage(hCtlSORT, WM_SETTEXT, (WPARAM)0, (LONG)(LPSTR)"Sort by Node Description");
+              }
+            }
+            else
+            {
+              SendMessage(hCtlSORT, WM_SETTEXT, (WPARAM)0, (LONG)(LPSTR)"Sort by Node Abbreviation");
+            }
+          }
+          SendMessage(hCtlALLNODES, LB_RESETCONTENT, (WPARAM)0, (LPARAM)0);
+          for(nI = 0; nI < numNodes; nI++)
+          {
+            strcpy(tempString, pNOD[nI].szAbbrName);
+            strcat(tempString, "\t");
+            NODESKey0.recordID = pNOD[nI].recordID;
+            btrieve(B_GETEQUAL, TMS_NODES, &NODES, &NODESKey0, 0);
+            strncpy(szarString, NODES.intersection, NODES_INTERSECTION_LENGTH);
+            trim(szarString, NODES_INTERSECTION_LENGTH);
+            strcpy(pNOD[nI].szDescription, szarString);
+            strcat(tempString, pNOD[nI].szDescription);
+            nJ = (int)SendMessage(hCtlALLNODES, LB_ADDSTRING, (WPARAM)0, (LONG)(LPSTR)tempString);
+            SendMessage(hCtlALLNODES, LB_SETITEMDATA, (WPARAM)nJ, (LPARAM)pNOD[nI].recordID);
+          }
           break;
 
         case ADDPATTERN_SHOWDESCRIPTION:
           bShowAddress = FALSE;
-          SendMessage(hWndDlg, WM_USERSETUP, (WPARAM)0, (LPARAM)0);
+          if(bDisplaySystemNodes)
+          { 
+            if(bSortingByAbbrName)
+            {
+              if(bShowAddress)
+              {
+                SendMessage(hCtlSORT, WM_SETTEXT, (WPARAM)0, (LONG)(LPSTR)"Sort by Node Address");
+              }
+              else
+              {
+                SendMessage(hCtlSORT, WM_SETTEXT, (WPARAM)0, (LONG)(LPSTR)"Sort by Node Description");
+              }
+            }
+            else
+            {
+              SendMessage(hCtlSORT, WM_SETTEXT, (WPARAM)0, (LONG)(LPSTR)"Sort by Node Abbreviation");
+            }
+          }
+          SendMessage(hCtlALLNODES, LB_RESETCONTENT, (WPARAM)0, (LPARAM)0);
+          for(nI = 0; nI < numNodes; nI++)
+          {
+            strcpy(tempString, pNOD[nI].szAbbrName);
+            strcat(tempString, "\t");
+            NODESKey0.recordID = pNOD[nI].recordID;
+            btrieve(B_GETEQUAL, TMS_NODES, &NODES, &NODESKey0, 0);
+            strncpy(szarString, NODES.description, NODES_DESCRIPTION_LENGTH);
+            trim(szarString, NODES_DESCRIPTION_LENGTH);
+            strcpy(pNOD[nI].szDescription, szarString);
+            strcat(tempString, pNOD[nI].szDescription);
+            nJ = (int)SendMessage(hCtlALLNODES, LB_ADDSTRING, (WPARAM)0, (LONG)(LPSTR)tempString);
+            SendMessage(hCtlALLNODES, LB_SETITEMDATA, (WPARAM)nJ, (LPARAM)pNOD[nI].recordID);
+          }
           break;
 //
 //  Comments
@@ -1056,18 +1254,30 @@ BOOL CALLBACK ADDPATTERNMsgProc(HWND hWndDlg, UINT Message, WPARAM wParam, LPARA
            if(nJ == 0)
            {
              if(SendMessage(hCtlNA, BM_GETCHECK, (WPARAM)0, (LPARAM)0))
+             {
               PATTERNS.COMMENTSrecordID = NO_RECORD;
+             }
              else
              {
                nM = (int)SendMessage(hCtlCOMMENTCODE, CB_GETCURSEL, (WPARAM)0, (LPARAM)0);
                PATTERNS.COMMENTSrecordID = (nM == CB_ERR ? NO_RECORD : SendMessage(hCtlCOMMENTCODE, CB_GETITEMDATA, (WPARAM)nM, (LPARAM)0));
              }
+             SendMessage(hCtlFROMTEXT, WM_GETTEXT, (WPARAM)TEMPSTRING_LENGTH, (LONG)(LPSTR)tempString);
+             pad(tempString, PATTERNS_FROMTEXT_LENGTH);
+             strncpy(PATTERNS.fromText, tempString, PATTERNS_FROMTEXT_LENGTH);
+             SendMessage(hCtlTOTEXT, WM_GETTEXT, (WPARAM)TEMPSTRING_LENGTH, (LONG)(LPSTR)tempString);
+             pad(tempString, PATTERNS_TOTEXT_LENGTH);
+             strncpy(PATTERNS.toText, tempString, PATTERNS_TOTEXT_LENGTH);
            }
            PATTERNS.flags = 0;
            if(pPAT[nK].bMLP)
+           {
              PATTERNS.flags |= PATTERNS_FLAG_MLP;
+           }
            if(pPAT[nK].bBusStop)
+           {
              PATTERNS.flags |= PATTERNS_FLAG_BUSSTOP;
+           }
            memset(PATTERNS.reserved, 0x00, PATTERNS_RESERVED_LENGTH);
            btrieve(B_INSERT, TMS_PATTERNS, &PATTERNS, &PATTERNSKey0, 0);
            if(updateRecordID == NO_RECORD && PATTERNS.PATTERNNAMESrecordID == basePatternRecordID)
@@ -1130,6 +1340,7 @@ BOOL CALLBACK ADDPATTERNMsgProc(HWND hWndDlg, UINT Message, WPARAM wParam, LPARA
 //  Salright
 //
          TMSHeapFree(pPAT);
+         TMSHeapFree(pNOD);
          SetCursor(saveCursor);
          EndDialog(hWndDlg, TRUE);
          break;
@@ -1138,6 +1349,7 @@ BOOL CALLBACK ADDPATTERNMsgProc(HWND hWndDlg, UINT Message, WPARAM wParam, LPARA
 //
        case IDCANCEL:
          TMSHeapFree(pPAT);
+         TMSHeapFree(pNOD);
          EndDialog(hWndDlg, FALSE);
          break;
 //

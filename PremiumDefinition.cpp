@@ -116,6 +116,7 @@ BOOL CPremiumDefinition::OnInitDialog()
   pButtonUSECONNIFNOSCHED = (CButton *)GetDlgItem(WORKRULES_USECONNIFNOSCHED);
 
   pButtonPAIDTRAVEL = (CButton *)GetDlgItem(WORKRULES_PAIDTRAVEL);
+  pButtonDONTPAYSHUTTLETRIPS = (CButton *)GetDlgItem(WORKRULES_DONTPAYSHUTTLETRIPS);
   pEditPAYFLATMINUTES = (CEdit *)GetDlgItem(WORKRULES_PAYFLATMINUTES);
   pEditPERCENTOFACTUAL = (CEdit *)GetDlgItem(WORKRULES_PERCENTOFACTUAL);
   pEditSTAGGEREDPERCENT = (CEdit *)GetDlgItem(WORKRULES_STAGGEREDPERCENT);
@@ -459,6 +460,7 @@ void CPremiumDefinition::EnableTravelSection(BOOL bEnable)
   pEditPERCENTOFACTUAL->EnableWindow(bEnable);
   pEditSTAGGEREDPERCENT->EnableWindow(bEnable);
   pEditSTAGGEREDMINUTES->EnableWindow(bEnable);
+  pButtonDONTPAYSHUTTLETRIPS->EnableWindow(bEnable);
   pButtonPAYACTUAL->EnableWindow(bEnable);
   pButtonPAYFLAT->EnableWindow(bEnable);
   pButtonPAYPERCENTAGE->EnableWindow(bEnable);
@@ -621,8 +623,9 @@ void CPremiumDefinition::OnUpdate()
   {
     int feasibleRG[4] = {WORKRULES_TIMEENTERED, WORKRULES_ASINCONNECTIONS,
                          WORKRULES_ASPERSCHEDULE, WORKRULES_ASPERSCHEDULEDWELL};
-    int paidHowRG[4]  = {WORKRULES_PAYACTUAL, WORKRULES_PAYFLAT, 
-                         WORKRULES_PAYPERCENTAGE, WORKRULES_PAYSTAGGERED};
+    int paidHowRG[5]  = {WORKRULES_PAYACTUAL, WORKRULES_PAYFLAT, 
+                         WORKRULES_PAYPERCENTAGE, WORKRULES_PAYSTAGGERED,
+                         WORKRULES_DONTPAYSHUTTLETRIPS};
     CButton* pCtl;
 
     PREMIUM[m_premiumIndex].flags |= PREMIUMFLAGS_TRAVELTIMEPREMIUM;
@@ -658,7 +661,7 @@ void CPremiumDefinition::OnUpdate()
         PREMIUM[m_premiumIndex].flags &= ~PREMIUMFLAGS_USECONNECTIONIFNODYNAMIC;
       }
     }
-    for(nI = 0; nI < 4; nI++)
+    for(nI = 0; nI < 5; nI++)
     {
       pCtl = (CButton *)GetDlgItem(paidHowRG[nI]);
       if(pCtl == NULL)

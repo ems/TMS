@@ -1,6 +1,6 @@
 //Microsoft Developer Studio generated resource script.
 //
-#include "resource.h"
+#include "resource.h" 
 
 // Generated Help ID header file
 #define APSTUDIO_HIDDEN_SYMBOLS
@@ -319,6 +319,8 @@ BEGIN
 
                 MENUITEM "&MLP times...",               ID_EDIT_UPDATE_RANGE_SHIFT
 
+                MENUITEM "Trip &numbers...",            ID_EDIT_UPDATE_RANGE_TRIPNUMBERS
+
             END
             MENUITEM "Update trip number...",       ID_EDIT_UPDATE_TRIP_NUMBER
 
@@ -467,6 +469,9 @@ BEGIN
         POPUP "Commands"
         BEGIN
             MENUITEM "&Cut runs...",                ID_COMMANDS_CUT_RUNS
+            MENUITEM SEPARATOR
+            MENUITEM "&Force pull-outs and pull-ins...", 
+                                                    ID_COMMANDS_FORCE_POPI
             MENUITEM SEPARATOR
             MENUITEM "&Delete runs...",             ID_COMMANDS_DELETE_RUNS
             MENUITEM SEPARATOR
@@ -1740,58 +1745,62 @@ BEGIN
     PUSHBUTTON      "&Help",IDHELP,123,97,50,14
 END
 
-IDD_ADDROUTE DIALOGEX 0, 0, 363, 178
+IDD_ADDROUTE DIALOGEX 0, 0, 422, 196
 STYLE DS_MODALFRAME | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU
 EXSTYLE WS_EX_CONTEXTHELP
 CAPTION "Add / Update Routes"
 FONT 8, "Calibri", 0, 0, 0x1
 BEGIN
-    GROUPBOX        "Route characteristics",IDC_STATIC,7,7,176,143
-    RTEXT           "Number:",IDC_STATIC,16,23,37,10,NOT WS_GROUP
+    GROUPBOX        "Identification",IDC_STATIC,7,7,227,55
+    RTEXT           "Number:",IDC_STATIC,17,23,37,10,NOT WS_GROUP
     EDITTEXT        ADDROUTE_NUMBER,57,21,56,14,ES_AUTOHSCROLL
-    RTEXT           "Name:",IDC_STATIC,16,44,37,10,NOT WS_GROUP
-    EDITTEXT        ADDROUTE_NAME,57,42,117,14,ES_AUTOHSCROLL
-    GROUPBOX        "Direction of travel",IDC_STATIC,14,74,160,69
+    RTEXT           "Alternate:",IDC_STATIC,123,23,37,10,NOT WS_GROUP
+    EDITTEXT        ADDROUTE_ALTERNATE,164,21,56,14,ES_AUTOHSCROLL | 
+                    ES_NUMBER
+    RTEXT           "Name:",IDC_STATIC,17,42,37,10,NOT WS_GROUP
+    EDITTEXT        ADDROUTE_NAME,57,40,163,14,ES_AUTOHSCROLL
+    GROUPBOX        "Direction(s) of travel",IDC_STATIC,7,64,227,69
     CONTROL         "Bi-directional",ADDROUTE_BIDIRECTIONAL,"Button",
-                    BS_AUTORADIOBUTTON | WS_GROUP | WS_TABSTOP,26,84,56,10
+                    BS_AUTORADIOBUTTON | WS_GROUP | WS_TABSTOP,27,76,56,10
     CONTROL         "One way / circular",ADDROUTE_CIRCULAR,"Button",
-                    BS_AUTORADIOBUTTON,93,84,74,10
-    RTEXT           "Outbound:",IDC_STATIC,16,106,37,10,NOT WS_GROUP
-    COMBOBOX        ADDROUTE_OUTBOUND,57,104,107,41,CBS_DROPDOWNLIST | 
-                    WS_VSCROLL | WS_TABSTOP
-    RTEXT           "Inbound:",ADDROUTE_INBOUND_TEXT,16,126,37,10,NOT 
+                    BS_AUTORADIOBUTTON,95,76,74,10
+    RTEXT           "Outbound direction:",IDC_STATIC,26,96,76,10,NOT 
                     WS_GROUP
-    COMBOBOX        ADDROUTE_INBOUND,57,124,107,41,CBS_DROPDOWNLIST | 
+    COMBOBOX        ADDROUTE_OUTBOUND,104,94,116,41,CBS_DROPDOWNLIST | 
                     WS_VSCROLL | WS_TABSTOP
-    GROUPBOX        "Flags",IDC_STATIC,190,7,166,49
+    RTEXT           "Inbound direction:",ADDROUTE_INBOUND_TEXT,24,116,78,10,
+                    NOT WS_GROUP
+    COMBOBOX        ADDROUTE_INBOUND,104,115,116,41,CBS_DROPDOWNLIST | 
+                    WS_VSCROLL | WS_TABSTOP
+    GROUPBOX        "Flags",IDC_STATIC,8,135,227,55
     CONTROL         "This route is an ""Employee Shuttle""",ADDROUTE_SHUTTLE,
-                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,209,18,127,10
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,27,148,127,10
     CONTROL         "This is a school route",ADDROUTE_SCHOOL,"Button",
-                    BS_AUTOCHECKBOX | WS_TABSTOP,209,29,83,10
+                    BS_AUTOCHECKBOX | WS_TABSTOP,27,161,83,10
     CONTROL         "This is a ""Route Group"" (RGRP)",ADDROUTE_RGRP,"Button",
-                    BS_AUTOCHECKBOX | WS_TABSTOP,209,41,109,10
-    GROUPBOX        "Terminal bay allocations",IDC_STATIC,190,55,166,54
-    GROUPBOX        "Outb ound",IDC_STATIC,199,64,74,39
+                    BS_AUTOCHECKBOX | WS_TABSTOP,27,172,109,10
+    GROUPBOX        "Terminal bay allocations",IDC_STATIC,240,7,176,69
+    GROUPBOX        "Outb ound",IDC_STATIC,251,21,74,47
     CONTROL         "N/A",ADDROUTE_OBBAYNA,"Button",BS_AUTORADIOBUTTON | 
-                    WS_GROUP | WS_TABSTOP,208,73,29,10
-    CONTROL         "",ADDROUTE_OBBAY,"Button",BS_AUTORADIOBUTTON,208,87,9,8
-    COMBOBOX        ADDROUTE_OBBAYLIST,220,85,46,50,CBS_DROPDOWNLIST | 
+                    WS_GROUP | WS_TABSTOP,259,34,29,10
+    CONTROL         "",ADDROUTE_OBBAY,"Button",BS_AUTORADIOBUTTON,259,51,9,8
+    COMBOBOX        ADDROUTE_OBBAYLIST,273,49,46,50,CBS_DROPDOWNLIST | 
                     WS_VSCROLL
-    GROUPBOX        "Inbound",ADDROUTE_IBGROUPBOX,278,64,74,39
+    GROUPBOX        "Inbound",ADDROUTE_IBGROUPBOX,330,21,74,47
     CONTROL         "N/A",ADDROUTE_IBBAYNA,"Button",BS_AUTORADIOBUTTON | 
-                    WS_GROUP | WS_TABSTOP,287,73,29,10
-    CONTROL         "",ADDROUTE_IBBAY,"Button",BS_AUTORADIOBUTTON,287,87,9,8
-    COMBOBOX        ADDROUTE_IBBAYLIST,299,85,46,50,CBS_DROPDOWNLIST | 
+                    WS_GROUP | WS_TABSTOP,339,34,29,10
+    CONTROL         "",ADDROUTE_IBBAY,"Button",BS_AUTORADIOBUTTON,339,51,9,8
+    COMBOBOX        ADDROUTE_IBBAYLIST,351,49,46,50,CBS_DROPDOWNLIST | 
                     WS_VSCROLL
-    GROUPBOX        "Comment code",IDC_STATIC,189,108,167,41
+    GROUPBOX        "Comment code",IDC_STATIC,240,82,176,51
     CONTROL         "N/A",ADDROUTE_NA,"Button",BS_AUTORADIOBUTTON | WS_GROUP | 
-                    WS_TABSTOP,208,119,29,10
-    CONTROL         "",ADDROUTE_CC,"Button",BS_AUTORADIOBUTTON,208,132,9,8
-    COMBOBOX        ADDROUTE_COMMENTCODE,220,131,78,48,CBS_DROPDOWNLIST | 
+                    WS_TABSTOP,259,96,29,10
+    CONTROL         "",ADDROUTE_CC,"Button",BS_AUTORADIOBUTTON,259,115,9,8
+    COMBOBOX        ADDROUTE_COMMENTCODE,273,114,78,48,CBS_DROPDOWNLIST | 
                     CBS_SORT | WS_VSCROLL | WS_TABSTOP
-    DEFPUSHBUTTON   "&OK",IDOK,98,157,50,14
-    PUSHBUTTON      "&Cancel",IDCANCEL,156,157,50,14
-    PUSHBUTTON      "&Help",IDHELP,214,157,50,14
+    DEFPUSHBUTTON   "&OK",IDOK,246,158,50,14
+    PUSHBUTTON      "&Cancel",IDCANCEL,304,158,50,14
+    PUSHBUTTON      "&Help",IDHELP,362,158,50,14
 END
 
 IDD_ADDSERVICE DIALOGEX 0, 0, 202, 132
@@ -1849,7 +1858,7 @@ IDD_ADDPATTERN DIALOGEX 0, 0, 483, 258
 STYLE DS_MODALFRAME | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU
 EXSTYLE WS_EX_CONTEXTHELP
 CAPTION "Add / Update Patterns"
-FONT 8, "Calibri", 0, 0, 0x1
+FONT 8, "Calibri"
 BEGIN
     CTEXT           "This pattern will appear on direction %s",
                     ADDPATTERN_DESTINATION,7,7,469,8
@@ -1862,7 +1871,7 @@ BEGIN
                     BS_AUTORADIOBUTTON | WS_GROUP | WS_TABSTOP,103,27,81,10
     CONTROL         "Show node's description",ADDPATTERN_SHOWDESCRIPTION,
                     "Button",BS_AUTORADIOBUTTON,193,27,91,10
-    LISTBOX         ADDPATTERN_ALLNODES,19,38,261,210,LBS_MULTIPLESEL | 
+    LISTBOX         ADDPATTERN_ALLNODES,19,38,261,164,LBS_MULTIPLESEL | 
                     LBS_USETABSTOPS | LBS_EXTENDEDSEL | WS_VSCROLL | 
                     WS_TABSTOP
     PUSHBUTTON      "&Add >>",IDADD,304,87,50,14
@@ -1877,14 +1886,19 @@ BEGIN
     CONTROL         "",ADDPATTERN_CC,"Button",BS_AUTORADIOBUTTON,380,209,9,8
     COMBOBOX        ADDPATTERN_COMMENTCODE,392,206,78,59,CBS_DROPDOWNLIST | 
                     CBS_SORT | WS_VSCROLL | WS_TABSTOP
+    RTEXT           """From"" Text:",IDC_STATIC,8,238,40,8
+    EDITTEXT        ADDPATTERN_FROMTEXT,50,236,100,14,ES_AUTOHSCROLL
+    RTEXT           """To"" Text:",IDC_STATIC,155,238,32,8
+    EDITTEXT        ADDPATTERN_TOTEXT,189,236,100,14,ES_AUTOHSCROLL
     DEFPUSHBUTTON   "&OK",IDOK,304,237,50,14
     PUSHBUTTON      "&Cancel",IDCANCEL,365,237,50,14
     PUSHBUTTON      "&Help",IDHELP,426,237,50,14
     GROUPBOX        "Pattern characteristics",IDC_STATIC,363,25,113,154
     GROUPBOX        "System or Pattern nodes",ADDPATTERN_ALLTITLE,7,17,284,
-                    235
+                    209
     LTEXT           "Timepoints:",IDC_STATIC,372,54,37,8
-    GROUPBOX        "Comment code",IDC_STATIC,363,186,113,41
+    GROUPBOX        "Comment code",IDC_STATIC,363,185,113,41
+    PUSHBUTTON      "Sort",IDSORT,98,206,96,14
 END
 
 IDD_ADDSIGNCODE DIALOGEX 0, 0, 195, 90
@@ -3409,44 +3423,47 @@ BEGIN
                     WS_TABSTOP,20,142,173,10
     GROUPBOX        "Premium classification",IDC_STATIC,281,7,267,34
     CONTROL         "Report time",WORKRULES_CLASSIFIEDASREPORTTIME,"Button",
-                    BS_AUTORADIOBUTTON,294,16,53,10
+                    BS_AUTORADIOBUTTON,300,16,53,10
     CONTROL         "Turnin time",WORKRULES_CLASSIFIEDASTURNINTIME,"Button",
-                    BS_AUTORADIOBUTTON,391,16,71,10
+                    BS_AUTORADIOBUTTON,395,16,71,10
     CONTROL         "Travel time",WORKRULES_CLASSIFIEDASTRAVELTIME,"Button",
-                    BS_AUTORADIOBUTTON,294,27,53,10
+                    BS_AUTORADIOBUTTON,300,27,53,10
     CONTROL         "Paid break / meal",WORKRULES_CLASSIFIEDASPAIDBREAK,
-                    "Button",BS_AUTORADIOBUTTON,391,27,71,10
+                    "Button",BS_AUTORADIOBUTTON,395,27,71,10
     GROUPBOX        "Travel time premiums only",WORKRULES_TRAVELTIMEONLY,281,
                     42,267,144
     GROUPBOX        "Actual travel time",WORKRULES_ACTUALTRAVEL,290,55,249,
                     63
     CONTROL         "As per Premium time",WORKRULES_TIMEENTERED,"Button",
-                    BS_AUTORADIOBUTTON | WS_GROUP | WS_TABSTOP,298,67,78,10
+                    BS_AUTORADIOBUTTON | WS_GROUP | WS_TABSTOP,300,67,78,10
     CONTROL         "Scheduled",WORKRULES_ASPERSCHEDULE,"Button",
                     BS_AUTORADIOBUTTON,395,67,72,10
     CONTROL         "From Connections",WORKRULES_ASINCONNECTIONS,"Button",
-                    BS_AUTORADIOBUTTON,298,82,78,10
+                    BS_AUTORADIOBUTTON,300,82,78,10
     CONTROL         "Scheduled + dwell",WORKRULES_ASPERSCHEDULEDWELL,"Button",
                     BS_AUTORADIOBUTTON,395,82,72,10
     CONTROL         "Use Connections Table if no scheduled trip(s) available",
                     WORKRULES_USECONNIFNOSCHED,"Button",BS_AUTOCHECKBOX | 
                     BS_MULTILINE | WS_TABSTOP,395,94,105,21
-    GROUPBOX        "Paid travel time",WORKRULES_PAIDTRAVEL,290,120,249,59
+    GROUPBOX        "Paid travel time",WORKRULES_PAIDTRAVEL,290,120,249,62
+    CONTROL         "Do not pay for trips on an employee shuttle",
+                    WORKRULES_DONTPAYSHUTTLETRIPS,"Button",
+                    BS_AUTORADIOBUTTON,300,131,150,10
     CONTROL         "As per Actual travel time",WORKRULES_PAYACTUAL,"Button",
-                    BS_AUTORADIOBUTTON | WS_GROUP | WS_TABSTOP,298,133,91,12
-    CONTROL         "% of Actual:",WORKRULES_PAYPERCENTAGE,"Button",
-                    BS_AUTORADIOBUTTON,395,133,55,12
+                    BS_AUTORADIOBUTTON | WS_GROUP | WS_TABSTOP,300,142,91,12
     CONTROL         "Flat time:",WORKRULES_PAYFLAT,"Button",
-                    BS_AUTORADIOBUTTON,298,150,43,12
+                    BS_AUTORADIOBUTTON,395,143,43,12
+    CONTROL         "% of Actual:",WORKRULES_PAYPERCENTAGE,"Button",
+                    BS_AUTORADIOBUTTON,300,156,55,12
     CONTROL         "",WORKRULES_PAYSTAGGERED,"Button",BS_AUTORADIOBUTTON | 
-                    BS_MULTILINE,395,150,11,12
-    EDITTEXT        WORKRULES_PERCENTOFACTUAL,453,133,31,14
-    EDITTEXT        WORKRULES_PAYFLATMINUTES,342,150,31,14
-    EDITTEXT        WORKRULES_STAGGEREDPERCENT,409,150,31,14
-    LTEXT           "% of actual <",WORKRULES_STATIC1,445,152,45,8
-    EDITTEXT        WORKRULES_STAGGEREDMINUTES,491,150,31,14
+                    BS_MULTILINE,395,156,11,12
+    EDITTEXT        WORKRULES_PAYFLATMINUTES,440,143,31,14
+    EDITTEXT        WORKRULES_PERCENTOFACTUAL,358,156,31,14
+    EDITTEXT        WORKRULES_STAGGEREDPERCENT,409,156,31,14
+    LTEXT           "% of actual <",WORKRULES_STATIC1,445,158,45,8
+    EDITTEXT        WORKRULES_STAGGEREDMINUTES,491,156,31,14
     LTEXT           "and ""Actual travel time"" otherwise",WORKRULES_STATIC2,
-                    410,166,119,8
+                    410,171,119,8
     DEFPUSHBUTTON   "&Update",IDUPDATE,195,194,50,14
     PUSHBUTTON      "&Finished",IDOK,253,194,50,14
     PUSHBUTTON      "&Help",IDHELP,311,194,50,14
@@ -4545,7 +4562,7 @@ IDD_ROSTERPARMS DIALOGEX 0, 0, 404, 374
 STYLE DS_MODALFRAME | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU
 EXSTYLE WS_EX_CONTEXTHELP
 CAPTION "Rostering Parameters"
-FONT 8, "Calibri", 0, 0, 0x1
+FONT 8, "Calibri"
 BEGIN
     CONTROL         "Must be the same",ROSTERPARMS_SAMEROUTE,"Button",
                     BS_AUTOCHECKBOX | WS_TABSTOP,24,30,73,10
@@ -4573,24 +4590,27 @@ BEGIN
                     ES_MULTILINE | ES_AUTOHSCROLL | ES_READONLY | 
                     ES_WANTRETURN | WS_VSCROLL
     PUSHBUTTON      "Edit...",IDEDIT,330,191,50,14
-    RTEXT           "Minimum work target:",IDC_STATIC,19,241,78,8
-    EDITTEXT        ROSTERPARMS_MINWORK,101,238,40,14,ES_AUTOHSCROLL
-    RTEXT           "Maximum work target:",IDC_STATIC,22,258,76,8
-    EDITTEXT        ROSTERPARMS_MAXWORK,101,256,40,14,ES_AUTOHSCROLL
+    RTEXT           "Minimum work target:",IDC_STATIC,19,243,78,8
+    EDITTEXT        ROSTERPARMS_MINWORK,101,240,40,14,ES_AUTOHSCROLL
+    RTEXT           "Maximum work target:",IDC_STATIC,22,264,76,8
+    EDITTEXT        ROSTERPARMS_MAXWORK,101,262,40,14,ES_AUTOHSCROLL
     CONTROL         "Equalize work between rosters",ROSTERPARMS_EQUALIZE,
-                    "Button",BS_AUTOCHECKBOX | BS_RIGHT | WS_TABSTOP,30,278,
+                    "Button",BS_AUTOCHECKBOX | BS_RIGHT | WS_TABSTOP,30,284,
                     111,10
-    RTEXT           "Is a run that ends after:",IDC_STATIC,163,241,79,8
-    EDITTEXT        ROSTERPARMS_NIGHTWORKAFTER,245,238,40,14,ES_UPPERCASE | 
+    CONTROL         "Starts after:",ROSTERPARMS_STARTSAFTER,"Button",
+                    BS_AUTORADIOBUTTON | WS_GROUP | WS_TABSTOP,188,236,53,10
+    CONTROL         "Ends after:",ROSTERPARMS_ENDSAFTER,"Button",
+                    BS_AUTORADIOBUTTON,188,248,53,10
+    EDITTEXT        ROSTERPARMS_NIGHTWORKAFTER,245,240,40,14,ES_UPPERCASE | 
                     ES_AUTOHSCROLL
-    RTEXT           "Maximum per roster:",IDC_STATIC,175,258,67,8
-    EDITTEXT        ROSTERPARMS_MAXNIGHTWORK,245,256,40,14,ES_AUTOHSCROLL
+    RTEXT           "Maximum per roster:",IDC_STATIC,175,264,67,8
+    EDITTEXT        ROSTERPARMS_MAXNIGHTWORK,245,262,40,14,ES_AUTOHSCROLL
     CONTROL         "Spin1",IDC_SPIN2,"msctls_updown32",UDS_SETBUDDYINT | 
                     UDS_ALIGNRIGHT | UDS_AUTOBUDDY | UDS_ARROWKEYS | 
-                    UDS_NOTHOUSANDS,281,257,11,14
+                    UDS_NOTHOUSANDS,281,263,11,14
     CONTROL         "A day off must follow night work",
                     ROSTERPARMS_OFFDAYMUSTFOLLOW,"Button",BS_AUTOCHECKBOX | 
-                    WS_TABSTOP,168,278,119,10
+                    WS_TABSTOP,168,284,119,10
     CONTROL         "Weekdays",ROSTERPARMS_FORCEEXTRASTOWEEKDAYS,"Button",
                     BS_AUTORADIOBUTTON | WS_GROUP | WS_TABSTOP,310,236,49,10
     CONTROL         "Weekends",ROSTERPARMS_FORCEEXTRASTOWEEKENDS,"Button",
@@ -7276,13 +7296,44 @@ BEGIN
     GROUPBOX        "Locations",IDC_STATIC,18,47,108,54
 END
 
-IDD_DIALOG2 DIALOG DISCARDABLE  0, 0, 186, 90
+IDD_CHANGETRIPNUMBERS DIALOG DISCARDABLE  0, 0, 194, 124
 STYLE DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU
-CAPTION "Dialog"
-FONT 8, "MS Sans Serif"
+CAPTION "Renumber Trips"
+FONT 8, "Calibri"
 BEGIN
-    DEFPUSHBUTTON   "OK",IDOK,129,7,50,14
-    PUSHBUTTON      "Cancel",IDCANCEL,129,24,50,14
+    CTEXT           "Warning!\nEntering numbers and pressing OK\nwill affect all hightlighted trips",
+                    IDC_STATIC,0,7,192,29
+    GROUPBOX        "Numbering",IDC_STATIC,48,44,94,52
+    RTEXT           "Start at:",IDC_STATIC,54,60,35,8
+    EDITTEXT        TRIPNUMBERS_STARTAT,90,57,40,14,ES_AUTOHSCROLL
+    CONTROL         "Spin1",IDC_SPIN1,"msctls_updown32",UDS_SETBUDDYINT | 
+                    UDS_ALIGNRIGHT | UDS_AUTOBUDDY | UDS_ARROWKEYS | 
+                    UDS_NOTHOUSANDS,128,58,11,14
+    RTEXT           "Increment:",IDC_STATIC,52,79,38,8
+    EDITTEXT        TRIPNUMBERS_INCREMENT,90,76,40,14,ES_AUTOHSCROLL
+    CONTROL         "Spin2",IDC_SPIN2,"msctls_updown32",UDS_SETBUDDYINT | 
+                    UDS_ALIGNRIGHT | UDS_AUTOBUDDY | UDS_ARROWKEYS | 
+                    UDS_NOTHOUSANDS,126,76,11,14
+    DEFPUSHBUTTON   "&OK",IDOK,13,103,50,14
+    PUSHBUTTON      "&Cancel",IDCANCEL,71,103,50,14
+    PUSHBUTTON      "&Help",IDHELP,129,103,50,14
+END
+
+IDD_FORCEPOPI DIALOG DISCARDABLE  0, 0, 176, 78
+STYLE DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Force Pull-outs and Pull-ins"
+FONT 8, "Calibri"
+BEGIN
+    CONTROL         "To closest garage",FORCEPOPI_TOCLOSEST,"Button",
+                    BS_AUTORADIOBUTTON | WS_GROUP | WS_TABSTOP,54,18,72,12
+    CONTROL         "To",FORCEPOPI_TOGARAGE,"Button",BS_AUTORADIOBUTTON,54,
+                    31,25,12
+    COMBOBOX        FORCEPOPI_GARAGELIST,79,31,46,50,CBS_DROPDOWNLIST | 
+                    WS_VSCROLL
+    DEFPUSHBUTTON   "&OK",IDOK,4,58,50,14
+    PUSHBUTTON      "&Cancel",IDCANCEL,62,58,50,14
+    PUSHBUTTON      "&Help",IDHELP,120,58,50,14
+    GROUPBOX        "Select",IDC_STATIC,37,6,100,44
 END
 
 
@@ -7293,8 +7344,8 @@ END
 //
 
 VS_VERSION_INFO VERSIONINFO
- FILEVERSION 4,8,2,13
- PRODUCTVERSION 4,8,2,13
+ FILEVERSION 4,8,2,28
+ PRODUCTVERSION 4,8,2,28
  FILEFLAGSMASK 0x3fL
 #ifdef _DEBUG
  FILEFLAGS 0x1L
@@ -7311,15 +7362,15 @@ BEGIN
         BEGIN
             VALUE "Comments", "...and it *still* beats the piss out of having to use DOS Trapeze™.\0"
             VALUE "CompanyName", "Schedule Masters, Inc.\0"
-            VALUE "FileDescription", "TMS - Release date: January 8, 2010\0"
-            VALUE "FileVersion", "4, 8, 2, 13\0"
+            VALUE "FileDescription", "TMS - Release date: May 11, 2010\0"
+            VALUE "FileVersion", "4, 8, 2, 28\0"
             VALUE "InternalName", "TMS\0"
             VALUE "LegalCopyright", "©1991-2010 Schedule Masters, Inc.\0"
             VALUE "LegalTrademarks", """TMS"", ""The Master Scheduler"", and ""VisualRuncutter"" are trademarks of Schedule Masters, Inc.\0"
             VALUE "OriginalFilename", "TMS.EXE\0"
             VALUE "PrivateBuild", "\0"
             VALUE "ProductName", "TMS - The Master Scheduler\0"
-            VALUE "ProductVersion", "4, 8, 2, 13\0"
+            VALUE "ProductVersion", "4, 8, 2, 28\0"
             VALUE "SpecialBuild", "\0"
         END
     END
@@ -7501,9 +7552,9 @@ BEGIN
     IDD_ADDROUTE, DIALOG
     BEGIN
         LEFTMARGIN, 7
-        RIGHTMARGIN, 356
+        RIGHTMARGIN, 415
         TOPMARGIN, 7
-        BOTTOMMARGIN, 171
+        BOTTOMMARGIN, 189
     END
 
     IDD_ADDSERVICE, DIALOG
@@ -8776,12 +8827,20 @@ BEGIN
         BOTTOMMARGIN, 125
     END
 
-    IDD_DIALOG2, DIALOG
+    IDD_CHANGETRIPNUMBERS, DIALOG
     BEGIN
         LEFTMARGIN, 7
-        RIGHTMARGIN, 179
+        RIGHTMARGIN, 187
         TOPMARGIN, 7
-        BOTTOMMARGIN, 83
+        BOTTOMMARGIN, 117
+    END
+
+    IDD_FORCEPOPI, DIALOG
+    BEGIN
+        LEFTMARGIN, 7
+        RIGHTMARGIN, 169
+        TOPMARGIN, 7
+        BOTTOMMARGIN, 71
     END
 END
 #endif    // APSTUDIO_INVOKED
@@ -10548,7 +10607,7 @@ BEGIN
     ERROR_150               "Print Dialog error %ld"
     ERROR_151               "The new trip number can't be less than or equal to zero."
     ERROR_152               "Overlap Error:\n%s"
-    ERROR_153               "No appropriate entry was found in the Connections Table for travel between %s and "
+    ERROR_153               "Note: No travel entry was found in the Connections Table for travel between %s and "
     ERROR_154               "Please select a division from the toolbar"
     ERROR_155               "You can't renumber a run to zero or blank"
     ERROR_156               "You must select a division"
@@ -11673,6 +11732,14 @@ BEGIN
     ERROR_371               "Failed to copy Access database from Fresh"
     ERROR_372               "Pressing Yes will update all driver vacation and sick time pool data.\n\nAre you sure you want to proceed?"
     ERROR_373               "This function requires the Supervisor's Password to complete"
+    ERROR_374               "You can't renumber a trip to zero or blank"
+END
+
+STRINGTABLE DISCARDABLE 
+BEGIN
+    ID_EDIT_UPDATE_RANGE_TRIPNUMBERS 
+                            "Modify the trip number field of the highlighted trip(s)"
+    ID_COMMANDS_FORCE_POPI  "Force pull-outs and pull-ins to occur rather than street reliefs"
 END
 
 #endif    // English (U.S.) resources

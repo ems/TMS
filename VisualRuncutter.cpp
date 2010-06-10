@@ -2209,17 +2209,20 @@ void CVisualRuncutter::OnCutWhatsleft()
   }  // nI
 //
 //  If at least one run was cut, update everything
-//
+//xxx
   if(bCutOne)
   {
     AssembleRuns();
     m_CutRunsDlg.ShowRuns(&m_VRColors);
+    InvalidateRect(&m_rcRepaint, TRUE);
+/*
     if(m_CurrentDisplayFlag & VR_FLAG_SUBSET)
       OnDisplayLeftovers();
     else if(m_CurrentDisplayFlag & VR_FLAG_ILLEGAL)
       OnDisplayIllegal();
     else
       OnDisplayAllblocks();
+*/
   }
 	
 }

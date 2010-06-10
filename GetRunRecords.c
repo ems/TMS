@@ -42,14 +42,14 @@ int GetRunRecords(long DIVISIONSrecordID, long SERVICESrecordID)
         RUNS.DIVISIONSrecordID == DIVISIONSrecordID &&
         RUNS.SERVICESrecordID == SERVICESrecordID)
   {
-    if(StatusBarAbort())
-    {
-      TMSHeapFree(m_pRunRecordData);
-      return(NO_RECORD);
-    }
-    LoadString(hInst, TEXT_042, szFormatString, sizeof(szFormatString));
-    sprintf(tempString, szFormatString, RUNS.runNumber);
-    StatusBarText(tempString);
+//    if(StatusBarAbort())
+//    {
+//      TMSHeapFree(m_pRunRecordData);
+//      return(NO_RECORD);
+//    }
+//    LoadString(hInst, TEXT_042, szFormatString, sizeof(szFormatString));
+//    sprintf(tempString, szFormatString, RUNS.runNumber);
+//    StatusBarText(tempString);
     m_pRunRecordData[m_numRunRecords].recordID = RUNS.recordID;
     m_pRunRecordData[m_numRunRecords].runNumber = RUNS.runNumber;
     m_pRunRecordData[m_numRunRecords].pieceNumber = RUNS.pieceNumber;

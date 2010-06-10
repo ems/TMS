@@ -127,7 +127,9 @@ typedef struct TripInfoStruct
 {
   long TRIPSrecordID;
   long tripNumber;
+  long RUNSrecordID[MAXRELIEFSPERTRIP];
   long runNumber[MAXRELIEFSPERTRIP];
+  long pieceNumber[MAXRELIEFSPERTRIP];
   long rosterNumber[MAXRELIEFSPERTRIP];
   long DRIVERSrecordID[MAXRELIEFSPERTRIP];
   long reliefAtNODESrecordID;
@@ -347,7 +349,7 @@ protected:
   void EstablishViewingArea();
   void SortPegboard(long flag);
   void GetOWMPointer(int row, OPENWORKDef** pOW);
-
+  int  BuildTripInfo(TripInfoDef* pTripInfo, BlockInfoDef BlockInfo);
   ABSENTDef m_AbsentList[500];
   int       m_numAbsent;
 

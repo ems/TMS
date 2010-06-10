@@ -323,6 +323,14 @@ BOOL CDailyOpsSO::OnInitDialog()
     LVC.pszText = "Total";
     pListCtrlLIST->InsertColumn(6, &LVC);
   }
+//
+//  Zero out the list
+//
+  for(nI = 0; nI < DAILYOPSSO_MAXAVILABLEDRIVERS; nI++)
+  {
+    memset(&m_AvailableDrivers[nI], 0x00, sizeof(AvailableDriversDef));
+    m_AvailableDrivers[nI].DRIVERSrecordID = NO_RECORD;
+  }
 
 //
 //  Get the operators who aren't working today
@@ -492,6 +500,13 @@ BOOL CDailyOpsSO::OnInitDialog()
             {
               if(ROSTER.DRIVERSrecordID == m_AvailableDrivers[nI].DRIVERSrecordID)
               {
+                if(m_AvailableDrivers[nI].flags & AVAILABLE_FLAG_STANDBY)
+                {
+                  m_AvailableDrivers[nI].DRIVERSrecordID = ROSTER.DRIVERSrecordID;
+                  m_AvailableDrivers[nI].flags = AVAILABLE_FLAG_BEFORE;
+                  m_AvailableDrivers[nI].time[0] = m_pIncoreRuns[serviceIndex].pRuns[runIndex].startTime;
+                  m_AvailableDrivers[nI].runNumber = m_pIncoreRuns[serviceIndex].pRuns[runIndex].runNumber;
+                }
                 bFound = TRUE;
                 break;
               }
@@ -558,7 +573,13 @@ BOOL CDailyOpsSO::OnInitDialog()
             {
               if(ROSTER.DRIVERSrecordID == m_AvailableDrivers[nI].DRIVERSrecordID)
               {
-                m_AvailableDrivers[nI].flags = AVAILABLE_FLAG_AFTER;
+                if(m_AvailableDrivers[nI].flags & AVAILABLE_FLAG_STANDBY)
+                {
+                  m_AvailableDrivers[nI].DRIVERSrecordID = ROSTER.DRIVERSrecordID;
+                  m_AvailableDrivers[nI].flags = AVAILABLE_FLAG_AFTER;
+                  m_AvailableDrivers[nI].time[0] = m_pIncoreRuns[serviceIndex].pRuns[runIndex].startTime;
+                  m_AvailableDrivers[nI].runNumber = m_pIncoreRuns[serviceIndex].pRuns[runIndex].runNumber;
+                }
                 bFound = TRUE;
                 break;
               }
@@ -620,10 +641,6 @@ BOOL CDailyOpsSO::OnInitDialog()
       {
         DRIVERSKey0.recordID = DAILYOPS.DRIVERSrecordID;
         rcode2 = btrieve(B_GETEQUAL, TMS_DRIVERS, &DRIVERS, &DRIVERSKey0, 0);
-        if(DRIVERS.recordID == 9)
-        {
-          int xx = 1;
-        }
         if(rcode2 == 0 && ConsideringThisDriverType(DRIVERS.DRIVERTYPESrecordID))
         {
           for(nI = 0; nI < num_AvailableDrivers; nI++)
@@ -678,10 +695,6 @@ BOOL CDailyOpsSO::OnInitDialog()
     if(m_AvailableDrivers[nI].flags & AVAILABLE_FLAG_INELIGIBLE)
     {
       continue;
-    }
-    if(m_AvailableDrivers[nI].DRIVERSrecordID == 9)
-    {
-      int xx = 1;
     }
 //
 //  What did he do yesterday?
@@ -812,10 +825,6 @@ BOOL CDailyOpsSO::OnInitDialog()
 //
   for(nI = 0; nI < num_AvailableDrivers; nI++)
   {
-    if(m_AvailableDrivers[nI].DRIVERSrecordID == 9)
-    {
-      int xx = 1;
-    }
     for(nJ = 0; nJ < m_pPassedData->numAbsent; nJ++)
     {
       if(m_pPassedData->pAbsentList[nJ].DRIVERSrecordID == m_AvailableDrivers[nI].DRIVERSrecordID)

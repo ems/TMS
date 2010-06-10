@@ -177,6 +177,8 @@ BOOL CRosterParms::OnInitDialog()
   pButtonFORCEEXTRASTOWEEKENDS = (CButton *)GetDlgItem(ROSTERPARMS_FORCEEXTRASTOWEEKENDS);
   pEditMINWORK = (CEdit *)GetDlgItem(ROSTERPARMS_MINWORK);
   pEditMAXWORK = (CEdit *)GetDlgItem(ROSTERPARMS_MAXWORK);
+  pButtonSTARTSAFTER = (CButton *)GetDlgItem(ROSTERPARMS_STARTSAFTER);
+  pButtonENDSAFTER = (CButton *)GetDlgItem(ROSTERPARMS_ENDSAFTER);
   pEditNIGHTWORKAFTER = (CEdit *)GetDlgItem(ROSTERPARMS_NIGHTWORKAFTER);
   pEditMAXNIGHTWORK = (CEdit *)GetDlgItem(ROSTERPARMS_MAXNIGHTWORK);
   pButtonOFFDAYMUSTFOLLOW = (CButton *)GetDlgItem(ROSTERPARMS_OFFDAYMUSTFOLLOW);
@@ -280,6 +282,14 @@ BOOL CRosterParms::OnInitDialog()
 //
 //  Set up the "night work" edit controls
 //
+  if(ROSTERPARMS.flags & ROSTERPARMS_FLAG_STARTSAFTER)
+  {
+    pButtonSTARTSAFTER->SetCheck(TRUE);
+  }
+  else
+  {
+    pButtonENDSAFTER->SetCheck(TRUE);
+  }
   pEditNIGHTWORKAFTER->SetWindowText(Tchar(ROSTERPARMS.nightWorkAfter));
   sprintf(tempString, "%d", (ROSTERPARMS.maxNightWork > 0 ? ROSTERPARMS.maxNightWork : 0));
   pEditMAXNIGHTWORK->SetWindowText(tempString);
@@ -534,8 +544,12 @@ void CRosterParms::OnOK()
 //
 //  Night work
 //
+  if(pButtonSTARTSAFTER->GetCheck())
+  {
+    ROSTERPARMS.flags |= ROSTERPARMS_FLAG_STARTSAFTER;
+  }
   pEditNIGHTWORKAFTER->GetWindowText(tempString, TEMPSTRING_LENGTH);
-  ROSTERPARMS.nightWorkAfter =cTime(tempString);
+  ROSTERPARMS.nightWorkAfter = cTime(tempString);
   pEditMAXNIGHTWORK->GetWindowText(tempString, TEMPSTRING_LENGTH);
   ROSTERPARMS.maxNightWork = atoi(tempString);
   if(pButtonOFFDAYMUSTFOLLOW->GetCheck())

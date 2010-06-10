@@ -71,8 +71,8 @@ public:
     iterator	operator++(int) // Postfix
 	{ iterator save(*this); operator++(); return save; }
     iterator	&operator=( const iterator &i ) { pc = i.pc; b = i.b; return *this; }
-    int		operator==( const iterator &i ) const { return b == i.b && pc == i.pc; }
-    int		operator!=( const iterator &i ) const { return b != i.b || pc != i.pc; }
+    bool		operator==( const iterator &i ) const { return b == i.b && pc == i.pc; }
+    bool		operator!=( const iterator &i ) const { return b != i.b || pc != i.pc; }
 
     const cKey	&operator*() const { return b->key; }
     cKey	&operator*() { return b->key; }

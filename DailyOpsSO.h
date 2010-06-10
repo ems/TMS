@@ -28,6 +28,8 @@ typedef struct AvailableDriversStruct
 #define DAILYOPSSO_FLAGS_RUNSPLIT   0x0001
 #define DAILYOPSSO_FLAGS_SHOWHOURS  0x0002
 
+#define DAILYOPSSO_MAXAVILABLEDRIVERS  250
+
 typedef struct DailyOpsSOPassedDataStruct
 {
   RosteredDriversDef* pRD;
@@ -76,7 +78,7 @@ protected:
   void EstablishOpenWork(long startDate);
   void CalculateAssignedTime(long startDate);
 
-  AvailableDriversDef m_AvailableDrivers[250];
+  AvailableDriversDef m_AvailableDrivers[DAILYOPSSO_MAXAVILABLEDRIVERS];
   DailyOpsSOPassedDataDef* m_pPassedData;
 
   int   m_Index;

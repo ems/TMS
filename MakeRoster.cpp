@@ -3,6 +3,8 @@
 //  and is Copyright (C) 1991-2004 Schedule Masters, Inc.
 //  All rights reserved.
 //
+#pragma warning (disable: 4786 4290)
+
 #include <fstream>
 #include <strstream>
 #include <string>
@@ -601,15 +603,27 @@ static	void	makeRosterSmartSubproblem(const int maxWorkDays, const unsigned int 
                 continue;
 
             int runIndex, serviceIndex;
-            if(m_pCOMBINED[i].flags[d] != 0)
-            {
-              int ii=1;
-            }
             runIndex = IndexFromRunID(&serviceIndex, m_pCOMBINED[i].RUNSrecordID[d], m_pCOMBINED[i].flags[d]);
 
+			// Check if night work.
+			bool isNightWork = false;
+			if( ROSTERPARMS.nightWorkAfter > 0 )
+			{
+        if(ROSTERPARMS.flags & ROSTERPARMS_FLAG_STARTSAFTER)
+        {
+  				if( m_pRRLIST[serviceIndex].pData[runIndex].onTime > ROSTERPARMS.nightWorkAfter )
+  					isNightWork = true;
+        }
+        else
+        {
+  				if( m_pRRLIST[serviceIndex].pData[runIndex].offTime > ROSTERPARMS.nightWorkAfter )
+  					isNightWork = true;
+        }
+			}
 			r.newWork( (RosterImprove::DayOfWeek)d,
-						encodeRunIndexServiceIndex(runIndex, serviceIndex), m_pRRLIST[serviceIndex].pData[runIndex].payTime,
-						ROSTERPARMS.nightWorkAfter < 0 ? false : m_pRRLIST[serviceIndex].pData[runIndex].offTime > ROSTERPARMS.nightWorkAfter );
+						encodeRunIndexServiceIndex(runIndex, serviceIndex),
+						m_pRRLIST[serviceIndex].pData[runIndex].payTime,
+						isNightWork );
         }
     }
 

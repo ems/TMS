@@ -554,7 +554,7 @@ BOOL FAR TMSRPT06(TMSRPTPassedDataDef *pPassedData)
             if(nK != 16)  // Layover and deadhead are combined
             {
               strcat(tempString, szarString);
-              strcat(tempString, nK == NUMCOLS - 1 ? "\n" : "\t");
+              strcat(tempString, nK == NUMCOLS - 1 ? "\r\n" : "\t");
             }
           }  // nK
           _lwrite(hfOutputFile, tempString, strlen(tempString));

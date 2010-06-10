@@ -77,6 +77,7 @@ protected:
 
   PayrollSelectionsDef* m_pPS;
 
+
   void PopulateOperatorList();
 
 	// Generated message map functions

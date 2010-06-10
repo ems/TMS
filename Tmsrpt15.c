@@ -5,6 +5,8 @@
 //
 #include "TMSHeader.h"
 
+#define NUMNUMBERS 5
+#define NUMSUBS    3
 //
 //  Load deadhead data from an external file into the connections table
 //
@@ -17,6 +19,9 @@ BOOL FAR TMSRPT15(TMSRPTPassedDataDef *pPassedData)
   char timeOfDay[6];
   char inputLine[512];
   char *ptr;
+  char szTime[16];
+  char szDist[16];
+  char szRoute[ROUTES_NUMBER_LENGTH + 1];
   long fromNodeRecordID;
   long toNodeRecordID;
   long stopNum;
@@ -33,11 +38,22 @@ BOOL FAR TMSRPT15(TMSRPTPassedDataDef *pPassedData)
   int  ddd, mm;
   float ss;
   int  action;
+  int  index;
+  long sub;
+  int  numEntries;
+  long number;
+  long originalRecordID;
+  long numbers[NUMNUMBERS] = {700000, 700005, 700021, 700035, 700110};
+  long recordIDs[NUMNUMBERS][NUMSUBS] = { 1, 39, -1,
+                                          4, 41, 42,
+                                         10, 40, -1,
+                                         16, 43, 44,
+                                         23, 45, 46};
 //
 //  Establish the type of deadhead load
 //
   nLoadType = GetPrivateProfileInt("Reports", "DeadheadLoadType", 1, TMSINIFile);
-  nLoadType = 17;
+  nLoadType = 25;
 //
 //  Load type 1
 //
@@ -85,7 +101,7 @@ BOOL FAR TMSRPT15(TMSRPTPassedDataDef *pPassedData)
             CONNECTIONS.fromTimeOfDay = NO_TIME;
             CONNECTIONS.toTimeOfDay = NO_TIME;
             CONNECTIONS.flags = CONNECTIONS_FLAG_TWOWAY |
-                  CONNECTIONS_FLAG_DEADHEADTIME | CONNECTIONS_FLAG_TRAVELTIME;
+                  CONNECTIONS_FLAG_TRAVELTIME;
             if(CONNECTIONS.connectionTime == 0)
               CONNECTIONS.flags |= CONNECTIONS_FLAG_RUNNINGTIME | CONNECTIONS_FLAG_EQUIVALENT;
             CONNECTIONS.distance = (float)NO_RECORD;
@@ -1042,7 +1058,7 @@ BOOL FAR TMSRPT15(TMSRPTPassedDataDef *pPassedData)
       NODES.recordID = recID++;
       NODES.COMMENTSrecordID = NO_RECORD;
       NODES.JURISDICTIONSrecordID = NO_RECORD;
-      NODES.flags = NODES_FLAG_STOP;
+//      NODES.flags = NODES_FLAG_STOP;
 //
 //  Number
 //
@@ -1051,23 +1067,29 @@ BOOL FAR TMSRPT15(TMSRPTPassedDataDef *pPassedData)
 //
 //  Abbr and long name
 //
+      sprintf(tempString, "%ld     ", NODES.number);
+      pad(tempString, NODES_ABBRNAME_LENGTH);
       strncpy(NODES.abbrName, tempString, NODES_ABBRNAME_LENGTH);
-      sprintf(szarString, "Prda%s", tempString);
-      strncpy(NODES.longName, szarString, NODES_LONGNAME_LENGTH);
+      pad(tempString, NODES_LONGNAME_LENGTH);
+      strncpy(NODES.longName, tempString, NODES_LONGNAME_LENGTH);
+//      sprintf(szarString, "Prda%s", tempString);
+//      strncpy(NODES.longName, szarString, NODES_LONGNAME_LENGTH);
 //
 //  Lon
 //
-      strcpy(tempString, strtok(NULL, "\t"));
-      NODES.longitude = (float)(atof(tempString) / 1000000);
+      strcpy(szarString, strtok(NULL, "\t"));
+      NODES.longitude = (float)(atof(szarString) / 1000000);
 //
 //  Lat
 //
-      strcpy(tempString, strtok(NULL, "\t"));
-      NODES.latitude = (float)(atof(tempString) / 1000000);
+      strcpy(szarString, strtok(NULL, "\t"));
+      NODES.latitude = (float)(atof(szarString) / 1000000);
 //
 //  Address
 //
-      strcpy(tempString, strtok(NULL, "\t\n"));
+      strcpy(szarString, strtok(NULL, "\t\n"));
+      strcat(tempString, " - ");
+      strcat(tempString, szarString);
       pad(tempString, NODES_INTERSECTION_LENGTH);
       strncpy(NODES.intersection, tempString, NODES_INTERSECTION_LENGTH);
 //
@@ -1152,6 +1174,679 @@ BOOL FAR TMSRPT15(TMSRPTPassedDataDef *pPassedData)
 //  Insert/Update
 // 
       rcode2 = btrieve(action, TMS_NODES, &NODES, &NODESKey0, 0);
+    }
+  }
+//
+//  Load type 18 (Travel times)
+//
+  else if(nLoadType == 18)
+  {
+//
+//  Open the text file
+//
+    fp = fopen("DHD.TXT", "r");
+    if(fp == NULL)
+    {
+      MessageBox(NULL, "Failed to open DHD.TXT", TMS, MB_OK);
+      goto cleanup;
+    }
+//
+//  Read from the input file and write to the btrieve file
+//
+    while(fscanf(fp, "%s\t%s\t%d", &fromNode, &toNode, &time) > 0)
+    {
+      if(time != -1)
+      {
+        strcpy(NODESKey2.abbrName, fromNode);
+        pad(NODESKey2.abbrName, NODES_ABBRNAME_LENGTH);
+        rcode2 = btrieve(B_GETEQUAL, TMS_NODES, &NODES, &NODESKey2, 2);
+        if(rcode2 == 0)
+        {
+          fromNodeRecordID = NODES.recordID;
+          strcpy(NODESKey2.abbrName, toNode);
+          pad(NODESKey2.abbrName, NODES_ABBRNAME_LENGTH);
+          rcode2 = btrieve(B_GETEQUAL, TMS_NODES, &NODES, &NODESKey2, 2);
+          if(rcode2 == 0)
+          {
+            toNodeRecordID = NODES.recordID;
+            rcode2 = btrieve(B_GETLAST, TMS_CONNECTIONS, &CONNECTIONS, &CONNECTIONSKey0, 0);
+            CONNECTIONS.recordID = AssignRecID(rcode2, CONNECTIONS.recordID);
+            CONNECTIONS.fromNODESrecordID = fromNodeRecordID;
+            CONNECTIONS.fromROUTESrecordID = NO_RECORD;
+            CONNECTIONS.fromSERVICESrecordID = NO_RECORD;
+            CONNECTIONS.fromPATTERNNAMESrecordID = NO_RECORD;
+            CONNECTIONS.toNODESrecordID = toNodeRecordID;
+            CONNECTIONS.toROUTESrecordID = NO_RECORD;
+            CONNECTIONS.toSERVICESrecordID = NO_RECORD;
+            CONNECTIONS.toPATTERNNAMESrecordID = NO_RECORD;
+            CONNECTIONS.connectionTime = time * 60;
+            CONNECTIONS.fromTimeOfDay = NO_TIME;
+            CONNECTIONS.toTimeOfDay = NO_TIME;
+            CONNECTIONS.flags = CONNECTIONS_FLAG_TWOWAY | CONNECTIONS_FLAG_TRAVELTIME;
+            CONNECTIONS.distance = (float)NO_RECORD;
+            CONNECTIONS.ROUTINGSrecordID = NO_RECORD;
+            rcode2 = btrieve(B_INSERT, TMS_CONNECTIONS, &CONNECTIONS, &CONNECTIONSKey0, 0);
+          }
+        }
+      }
+    }
+  }
+//
+//  Load type 19 (Deadhead times)
+//
+  else if(nLoadType == 19)
+  {
+//
+//  Open the text file
+//
+    fp = fopen("DHD.TXT", "r");
+    if(fp == NULL)
+    {
+      MessageBox(NULL, "Failed to open DHD.TXT", TMS, MB_OK);
+      goto cleanup;
+    }
+//
+//  Read from the input file and write to the btrieve file
+//
+    while(fgets(inputLine, sizeof(inputLine), fp))
+    {
+      strcpy(fromNode, strtok(inputLine, "\t"));
+      strcpy(toNode, strtok(NULL, "\t"));
+      strcpy(szTime, strtok(NULL, "\t"));
+      strcpy(szDist, strtok(NULL, "\t\n"));
+      strcpy(NODESKey2.abbrName, fromNode);
+      pad(NODESKey2.abbrName, NODES_ABBRNAME_LENGTH);
+      rcode2 = btrieve(B_GETEQUAL, TMS_NODES, &NODES, &NODESKey2, 2);
+      if(rcode2 != 0)
+      {
+        sprintf(tempString, "Couldn't find fromNode \"%s\"", fromNode);
+        MessageBox(NULL, tempString, TMS, MB_OK);
+      }
+      else
+      {
+        fromNodeRecordID = NODES.recordID;
+        strcpy(NODESKey2.abbrName, toNode);
+        pad(NODESKey2.abbrName, NODES_ABBRNAME_LENGTH);
+        rcode2 = btrieve(B_GETEQUAL, TMS_NODES, &NODES, &NODESKey2, 2);
+        if(rcode2 == 0)
+        {
+          numEntries = 1;
+          sub = NODES.recordID;
+          index = NO_RECORD;
+        }
+        else
+        {
+          numEntries = NO_RECORD;
+          for(nI = 0; nI < NUMNUMBERS; nI++)
+          {
+            if(atol(toNode) == numbers[nI])
+            {
+              numEntries = 3;
+              sub = recordIDs[nI][0];
+              index = nI;
+              break;
+            }
+          }
+          if(numEntries == NO_RECORD)
+          {
+            sprintf(tempString, "Couldn't find toNode \"%s\"", toNode);
+            MessageBox(NULL, tempString, TMS, MB_OK);
+          }
+        }
+        for(nI = 0; nI < numEntries; nI++)
+        {
+          if(nI > 0)
+          {
+            sub = recordIDs[index][nI];
+            if(sub == NO_RECORD)
+            {
+              break;
+            }
+          }
+          toNodeRecordID = sub;
+          rcode2 = btrieve(B_GETLAST, TMS_CONNECTIONS, &CONNECTIONS, &CONNECTIONSKey0, 0);
+          CONNECTIONS.recordID = AssignRecID(rcode2, CONNECTIONS.recordID);
+          CONNECTIONS.fromNODESrecordID = fromNodeRecordID;
+          CONNECTIONS.fromROUTESrecordID = NO_RECORD;
+          CONNECTIONS.fromSERVICESrecordID = NO_RECORD;
+          CONNECTIONS.fromPATTERNNAMESrecordID = NO_RECORD;
+          CONNECTIONS.toNODESrecordID = toNodeRecordID;
+          CONNECTIONS.toROUTESrecordID = NO_RECORD;
+          CONNECTIONS.toSERVICESrecordID = NO_RECORD;
+          CONNECTIONS.toPATTERNNAMESrecordID = NO_RECORD;
+          CONNECTIONS.fromTimeOfDay = NO_TIME;
+          CONNECTIONS.toTimeOfDay = NO_TIME;
+          CONNECTIONS.connectionTime = (long)((float)atof(szTime) * 60);
+          CONNECTIONS.flags = CONNECTIONS_FLAG_TRAVELTIME | CONNECTIONS_FLAG_DEADHEADTIME;
+          CONNECTIONS.distance = (float)atof(szDist);
+          CONNECTIONS.ROUTINGSrecordID = NO_RECORD;
+          rcode2 = btrieve(B_INSERT, TMS_CONNECTIONS, &CONNECTIONS, &CONNECTIONSKey0, 0);
+        }
+      }
+    }
+  }
+//
+//  Load type 20 (Connection times)
+//
+  else if(nLoadType == 20)
+  {
+//
+//  Open the text file
+//
+    fp = fopen("Connections.TXT", "r");
+    if(fp == NULL)
+    {
+      MessageBox(NULL, "Failed to open Connections.TXT", TMS, MB_OK);
+      goto cleanup;
+    }
+//
+//  Read from the input file and write to the btrieve file
+//
+    while(fgets(inputLine, sizeof(inputLine), fp))
+    {
+      strcpy(szRoute, strtok(inputLine, "\t"));
+      strcpy(fromNode, strtok(NULL, "_"));
+      strcpy(toNode, strtok(NULL, "\t"));
+      strcpy(szDist, strtok(NULL, "\t"));
+      strcpy(szTime, strtok(NULL, "\t\n"));
+//
+//  Route
+//
+      strcpy(ROUTESKey1.number, szRoute);
+      pad(ROUTESKey1.number, ROUTES_NUMBER_LENGTH);
+      rcode2 = btrieve(B_GETEQUAL, TMS_ROUTES, &ROUTES, &ROUTESKey1, 1);
+      if(rcode2 != 0)
+      {
+        sprintf(tempString, "Couldn't find Route \"%s\"", szRoute);
+        MessageBox(NULL, tempString, TMS, MB_OK);
+      }
+      else
+      {
+//
+//  From node
+//
+        strcpy(NODESKey2.abbrName, fromNode);
+        pad(NODESKey2.abbrName, NODES_ABBRNAME_LENGTH);
+        rcode2 = btrieve(B_GETEQUAL, TMS_NODES, &NODES, &NODESKey2, 2);
+        if(rcode2 != 0)
+        {
+          sprintf(tempString, "Couldn't find fromNode \"%s\"", fromNode);
+          MessageBox(NULL, tempString, TMS, MB_OK);
+        }
+        else
+        {
+          fromNodeRecordID = NODES.recordID;
+//
+//  To node
+//
+          strcpy(NODESKey2.abbrName, toNode);
+          pad(NODESKey2.abbrName, NODES_ABBRNAME_LENGTH);
+          rcode2 = btrieve(B_GETEQUAL, TMS_NODES, &NODES, &NODESKey2, 2);
+          if(rcode2 != 0)
+          {
+            sprintf(tempString, "Couldn't find toNode \"%s\"", toNode);
+            MessageBox(NULL, tempString, TMS, MB_OK);
+          }
+          else
+          {
+            rcode2 = btrieve(B_GETLAST, TMS_CONNECTIONS, &CONNECTIONS, &CONNECTIONSKey0, 0);
+            CONNECTIONS.recordID = AssignRecID(rcode2, CONNECTIONS.recordID);
+            CONNECTIONS.fromNODESrecordID = fromNodeRecordID;
+            CONNECTIONS.fromROUTESrecordID = ROUTES.recordID;
+            CONNECTIONS.fromSERVICESrecordID = NO_RECORD;
+            CONNECTIONS.fromPATTERNNAMESrecordID = NO_RECORD;
+            CONNECTIONS.toNODESrecordID = NODES.recordID;
+            CONNECTIONS.toROUTESrecordID = ROUTES.recordID;
+            CONNECTIONS.toSERVICESrecordID = NO_RECORD;
+            CONNECTIONS.toPATTERNNAMESrecordID = NO_RECORD;
+            CONNECTIONS.connectionTime = (long)(atol(&szTime[0]) * 60);
+            if(szTime[1] == '+')
+            {
+              CONNECTIONS.connectionTime += 30;
+            }
+            CONNECTIONS.fromTimeOfDay = NO_TIME;
+            CONNECTIONS.toTimeOfDay = NO_TIME;
+            CONNECTIONS.flags = CONNECTIONS_FLAG_RUNNINGTIME;
+            CONNECTIONS.distance = (float)atof(szDist);
+            CONNECTIONS.ROUTINGSrecordID = NO_RECORD;
+            rcode2 = btrieve(B_INSERT, TMS_CONNECTIONS, &CONNECTIONS, &CONNECTIONSKey0, 0);
+          }
+        }
+      }
+    }
+  }
+//
+//  Load type 21 (Stops)
+//
+  else if(nLoadType == 21)
+  {
+//
+//  Open the text file
+//
+    fp = fopen("Stops.TXT", "r");
+    if(fp == NULL)
+    {
+      MessageBox(NULL, "Failed to open Stops.TXT", TMS, MB_OK);
+      goto cleanup;
+    }
+//
+//  Read from the input file and write to the btrieve file
+//
+    rcode2 = btrieve(B_GETLAST, TMS_NODES, &NODES, &NODESKey0, 0);
+    recID = AssignRecID(rcode2, NODES.recordID);
+    while(fgets(inputLine, sizeof(inputLine), fp))
+    {
+      memset(&NODES, 0x00, sizeof(NODESDef));
+      NODES.recordID = recID++;
+      NODES.COMMENTSrecordID = NO_RECORD;
+      NODES.JURISDICTIONSrecordID = 1;
+      NODES.flags = NODES_FLAG_STOP;
+//
+//  Number (Abbr Name)
+//
+      strcpy(tempString, strtok(inputLine, "\t"));
+      stopNum = atol(tempString);
+      pad(tempString, NODES_ABBRNAME_LENGTH);
+      strncpy(NODES.abbrName, tempString, NODES_ABBRNAME_LENGTH);
+//
+//  Long name
+//
+      strcpy(tempString, strtok(NULL, "\t"));
+      pad(tempString, NODES_LONGNAME_LENGTH);
+      strncpy(NODES.longName, tempString, NODES_LONGNAME_LENGTH);
+//
+//  Legacy number
+//
+      NODES.number = stopNum;
+//
+//  Description
+//
+      strcpy(tempString, strtok(NULL, "\t"));
+      pad(tempString, NODES_DESCRIPTION_LENGTH);
+      strncpy(NODES.description, tempString, NODES_DESCRIPTION_LENGTH);
+//
+//  Address
+//
+      strcpy(tempString, strtok(NULL, "\t"));
+      pad(tempString, NODES_INTERSECTION_LENGTH);
+      strncpy(NODES.intersection, tempString, NODES_INTERSECTION_LENGTH);
+//
+//  Lat
+//
+      strcpy(tempString, strtok(NULL, "\t"));
+      NODES.latitude = (float)atof(tempString);
+//
+//  Long
+//
+      strcpy(tempString, strtok(NULL, "\t\n"));
+      NODES.longitude = (float)atof(tempString);
+//
+//  Insert
+// 
+      rcode2 = btrieve(B_INSERT, TMS_NODES, &NODES, &NODESKey0, 0);
+    }
+  }
+//
+//  Load type 22 (Stops)
+//
+  else if(nLoadType == 22)
+  {
+//
+//  Open the text file
+//
+    fp = fopen("Stops.TXT", "r");
+    if(fp == NULL)
+    {
+      MessageBox(NULL, "Failed to open Stops.TXT", TMS, MB_OK);
+      goto cleanup;
+    }
+//
+//  Read from the input file and write to the btrieve file
+//
+    rcode2 = btrieve(B_GETLAST, TMS_NODES, &NODES, &NODESKey0, 0);
+    recID = AssignRecID(rcode2, NODES.recordID);
+    while(fgets(inputLine, sizeof(inputLine), fp))
+    {
+      memset(&NODES, 0x00, sizeof(NODESDef));
+      NODES.recordID = recID++;
+      NODES.COMMENTSrecordID = NO_RECORD;
+      NODES.JURISDICTIONSrecordID = NO_RECORD;
+      NODES.flags = NODES_FLAG_STOP;
+//
+//  RecordID of original node
+//
+      strcpy(tempString, strtok(inputLine, "\t"));
+      originalRecordID = atol(tempString);
+//
+//  Number (Abbr Name)
+//
+      strcpy(tempString, strtok(NULL, "\t"));
+      stopNum = atol(tempString);
+      pad(tempString, NODES_ABBRNAME_LENGTH);
+      strncpy(NODES.abbrName, tempString, NODES_ABBRNAME_LENGTH);
+//
+//  Long name
+//
+      strcpy(tempString, strtok(NULL, "\t"));
+      pad(tempString, NODES_LONGNAME_LENGTH);
+      strncpy(NODES.longName, tempString, NODES_LONGNAME_LENGTH);
+//
+//  Description
+//
+      strcpy(tempString, strtok(NULL, "\t"));
+      pad(tempString, NODES_DESCRIPTION_LENGTH);
+      strncpy(NODES.description, tempString, NODES_DESCRIPTION_LENGTH);
+//
+//  Address
+//
+      strncpy(NODES.intersection, tempString, NODES_INTERSECTION_LENGTH);
+//
+//  Lat
+//
+      strcpy(tempString, strtok(NULL, "\t"));
+      NODES.latitude = (float)atof(tempString);
+//
+//  Long
+//
+      strcpy(tempString, strtok(NULL, "\t"));
+      NODES.longitude = (float)atof(tempString);
+//
+//  Number
+//
+      strcpy(tempString, strtok(NULL, "\t\n"));
+      number = atol(tempString) + 9000;
+      NODES.number = number;
+//
+//  Insert
+// 
+      rcode2 = btrieve(B_INSERT, TMS_NODES, &NODES, &NODESKey0, 0);
+//
+//  Update the node record to associate it with this stop
+//
+      NODESKey0.recordID = originalRecordID;
+      rcode2 = btrieve(B_GETEQUAL, TMS_NODES, &NODES, &NODESKey0, 0);
+      NODES.OBStopNumber = number;
+      NODES.IBStopNumber = number;
+      rcode2 = btrieve(B_UPDATE, TMS_NODES, &NODES, &NODESKey0, 0);
+    }
+  }
+//
+//  Load type 23 (Node update and stop insert)
+//
+  else if(nLoadType == 23)
+  {
+//
+//  Open the text file
+//
+    fp = fopen("NodeUpdates.TXT", "r");
+    if(fp == NULL)
+    {
+      MessageBox(NULL, "Failed to open NodeUpdates.TXT", TMS, MB_OK);
+      goto cleanup;
+    }
+//
+//  Read from the input file and write to the btrieve file
+//
+    rcode2 = btrieve(B_GETLAST, TMS_NODES, &NODES, &NODESKey0, 0);
+    recID = AssignRecID(rcode2, NODES.recordID);
+    while(fgets(inputLine, sizeof(inputLine), fp))
+    {
+//
+//  New or existing?
+//
+      strcpy(tempString, strtok(inputLine, "\t"));
+//
+//  New - therefore a stop
+//
+      if(strncmp(tempString, "Prda", 4) == 0)
+      {
+        memset(&NODES, 0x00, sizeof(NODESDef));
+        NODES.recordID = recID++;
+        NODES.COMMENTSrecordID = NO_RECORD;
+        NODES.JURISDICTIONSrecordID = NO_RECORD;
+        NODES.flags = NODES_FLAG_STOP;
+//
+//  Abbr and number
+//
+        strncpy(NODES.abbrName, &tempString[4], NODES_ABBRNAME_LENGTH);
+        NODES.number = atol(&tempString[4]);
+//
+//  Long name
+//
+        strncpy(NODES.longName, tempString, NODES_LONGNAME_LENGTH);
+//
+//  Description and Intersection
+//
+        strcpy(tempString, strtok(NULL, "\t"));
+        strncpy(NODES.description, tempString, NODES_DESCRIPTION_LENGTH);
+        pad(NODES.description, NODES_DESCRIPTION_LENGTH);
+        strncpy(NODES.intersection, NODES.description, NODES_DESCRIPTION_LENGTH);
+//
+//  Lat/long
+//
+        strcpy(tempString, strtok(NULL, "\t"));
+        NODES.latitude = (float)atof(tempString);
+        strcpy(tempString, strtok(NULL, "\t\n"));
+        NODES.longitude = (float)atof(tempString);
+//
+//  Insert
+// 
+        rcode2 = btrieve(B_INSERT, TMS_NODES, &NODES, &NODESKey0, 0);
+      }
+//
+//  Existing
+//
+      else
+      {
+//
+//  Get the record
+//
+        strncpy(NODESKey2.abbrName, tempString, NODES_ABBRNAME_LENGTH);
+        pad(NODESKey2.abbrName, NODES_ABBRNAME_LENGTH);
+        rcode2 = btrieve(B_GETEQUAL, TMS_NODES, &NODES, &NODESKey2, 2);
+        if(rcode2 == 0)
+        {
+//
+//  Description
+//
+          strcpy(tempString, strtok(NULL, "\t"));
+          pad(tempString, NODES_DESCRIPTION_LENGTH);
+          strncpy(NODES.description, tempString, NODES_DESCRIPTION_LENGTH);
+//
+//  Address
+//
+          strncpy(NODES.intersection, tempString, NODES_INTERSECTION_LENGTH);
+//
+//  Lat
+//
+          strcpy(tempString, strtok(NULL, "\t"));
+          NODES.latitude = (float)atof(tempString);
+//
+//  Long
+//
+          strcpy(tempString, strtok(NULL, "\t"));
+          NODES.longitude = (float)atof(tempString);
+//
+//  Number
+//
+          strcpy(tempString, strtok(NULL, "\t"));
+          number = atol(tempString);
+          NODES.number = number;
+//
+//  OB Number and IB Number
+//
+          strcpy(tempString, strtok(NULL, "\t"));
+          number = atol(tempString);
+          NODES.OBStopNumber = number;
+          strcpy(tempString, strtok(NULL, "\t\n"));
+          number = atol(tempString);
+          NODES.IBStopNumber = number;
+//
+//  Update
+//
+          rcode2 = btrieve(B_UPDATE, TMS_NODES, &NODES, &NODESKey0, 0);
+        }
+      }
+    }
+  }
+//
+//  Load type 24 (Stops and Timepoints)
+//
+  else if(nLoadType == 24)
+  {
+//
+//  Open the text file
+//
+    fp = fopen("TimepointUpdates.TXT", "r");
+    if(fp == NULL)
+    {
+      MessageBox(NULL, "Failed to open TimepointUpdates.TXT", TMS, MB_OK);
+      goto cleanup;
+    }
+//
+//  Read from the input file and write to the btrieve file
+//
+    rcode2 = btrieve(B_GETLAST, TMS_NODES, &NODES, &NODESKey0, 0);
+    recID = AssignRecID(rcode2, NODES.recordID);
+    while(fgets(inputLine, sizeof(inputLine), fp))
+    {
+      memset(&NODES, 0x00, sizeof(NODESDef));
+      NODES.recordID = recID++;
+      NODES.COMMENTSrecordID = NO_RECORD;
+      NODES.JURISDICTIONSrecordID = NO_RECORD;
+      NODES.flags = NODES_FLAG_STOP;
+//
+//  Number (Abbr Name)
+//
+      strcpy(tempString, strtok(inputLine, "\t"));
+      pad(tempString, NODES_ABBRNAME_LENGTH);
+      strncpy(NODES.abbrName, tempString, NODES_ABBRNAME_LENGTH);
+//
+//  Long name
+//
+      strcpy(tempString, strtok(NULL, "\t"));
+      pad(tempString, NODES_LONGNAME_LENGTH);
+      strncpy(NODES.longName, tempString, NODES_LONGNAME_LENGTH);
+//
+//  Description
+//
+      strcpy(tempString, strtok(NULL, "\t"));
+      pad(tempString, NODES_DESCRIPTION_LENGTH);
+      strncpy(NODES.description, tempString, NODES_DESCRIPTION_LENGTH);
+//
+//  Address
+//
+      strcpy(tempString, strtok(NULL, "\t"));
+      pad(tempString, NODES_INTERSECTION_LENGTH);
+      strncpy(NODES.intersection, tempString, NODES_INTERSECTION_LENGTH);
+//
+//  Lat
+//
+      strcpy(tempString, strtok(NULL, "\t"));
+      NODES.latitude = (float)atof(tempString);
+//
+//  Long
+//
+      strcpy(tempString, strtok(NULL, "\t"));
+      NODES.longitude = (float)atof(tempString);
+//
+//  Stop or node?
+//
+//  Stop
+//
+      if(NODES.abbrName[0] == '3')
+      {
+        strncpy(tempString, NODES.abbrName, NODES_ABBRNAME_LENGTH);
+        trim(tempString, NODES_ABBRNAME_LENGTH);
+        NODES.number = atol(tempString);
+      }
+//
+//  Node
+//
+      else
+      {
+//
+//  Number
+//
+        strcpy(tempString, strtok(NULL, "\t\n"));
+        number = atol(tempString);
+        NODES.number = number;
+//
+//  OB Number and IB Number
+//
+        strcpy(tempString, strtok(NULL, "\t"));
+        number = atol(tempString);
+        NODES.OBStopNumber = number;
+        strcpy(tempString, strtok(NULL, "\t\n"));
+        number = atol(tempString);
+        NODES.IBStopNumber = number;
+      }
+//
+//  Insert
+// 
+      rcode2 = btrieve(B_INSERT, TMS_NODES, &NODES, &NODESKey0, 0);
+      if(rcode2 != 0)
+      {
+        strncpy(szarString, NODES.abbrName, NODES_ABBRNAME_LENGTH);
+        trim(szarString, NODES_ABBRNAME_LENGTH);
+        sprintf(tempString, "Insert failed code %d on add of %s", rcode2, szarString);
+        MessageBox(NULL, tempString, TMS, MB_OK);
+      }
+    }
+  }
+//
+//  Load type 25
+//
+  if(nLoadType == 25)
+  {
+//
+//  Open the text file
+//
+    fp = fopen("DHD.TXT", "r");
+    if(fp == NULL)
+    {
+      MessageBox(NULL, "Failed to open DHD.TXT", TMS, MB_OK);
+      goto cleanup;
+    }
+//
+//  Read from the input file and write to the btrieve file
+//
+    while(fscanf(fp, "%s\t%s\t%d", &fromNode, &toNode, &time) > 0)
+    {
+      if(time != -1)
+      {
+        strcpy(NODESKey2.abbrName, fromNode);
+        pad(NODESKey2.abbrName, NODES_ABBRNAME_LENGTH);
+        rcode2 = btrieve(B_GETEQUAL, TMS_NODES, &NODES, &NODESKey2, 2);
+        if(rcode2 == 0)
+        {
+          fromNodeRecordID = NODES.recordID;
+          strcpy(NODESKey2.abbrName, toNode);
+          pad(NODESKey2.abbrName, NODES_ABBRNAME_LENGTH);
+          rcode2 = btrieve(B_GETEQUAL, TMS_NODES, &NODES, &NODESKey2, 2);
+          if(rcode2 == 0)
+          {
+            toNodeRecordID = NODES.recordID;
+            rcode2 = btrieve(B_GETLAST, TMS_CONNECTIONS, &CONNECTIONS, &CONNECTIONSKey0, 0);
+            CONNECTIONS.recordID = AssignRecID(rcode2, CONNECTIONS.recordID);
+            CONNECTIONS.fromNODESrecordID = fromNodeRecordID;
+            CONNECTIONS.fromROUTESrecordID = NO_RECORD;
+            CONNECTIONS.fromSERVICESrecordID = NO_RECORD;
+            CONNECTIONS.fromPATTERNNAMESrecordID = NO_RECORD;
+            CONNECTIONS.toNODESrecordID = toNodeRecordID;
+            CONNECTIONS.toROUTESrecordID = NO_RECORD;
+            CONNECTIONS.toSERVICESrecordID = NO_RECORD;
+            CONNECTIONS.toPATTERNNAMESrecordID = NO_RECORD;
+            CONNECTIONS.connectionTime = time * 60;
+            CONNECTIONS.fromTimeOfDay = NO_TIME;
+            CONNECTIONS.toTimeOfDay = NO_TIME;
+            CONNECTIONS.flags = CONNECTIONS_FLAG_DEADHEADTIME;
+            CONNECTIONS.distance = (float)NO_RECORD;
+            CONNECTIONS.ROUTINGSrecordID = NO_RECORD;
+            rcode2 = btrieve(B_INSERT, TMS_CONNECTIONS, &CONNECTIONS, &CONNECTIONSKey0, 0);
+          }
+        }
+      }
     }
   }
 //

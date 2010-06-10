@@ -783,7 +783,7 @@ BOOL CDailyOps::OnInitDialog()
   CRect rect(0, 0, 100, 1);
   MapDialogRect(rect);
   pEditMESSAGES->SetTabStops((14 * tm.tmAveCharWidth * 100) / rect.Width());
-  pListBoxCHRONOLOGY->SetTabStops((6 * tm.tmAveCharWidth * 100) / rect.Width());
+  pListBoxCHRONOLOGY->SetTabStops((7 * tm.tmAveCharWidth * 100) / rect.Width());
 
 //
 //  Vehicle assignment
@@ -1001,7 +1001,7 @@ BOOL CDailyOps::OnInitDialog()
     RUNSKey1.DIVISIONSrecordID = m_DailyOpsRUNSDivisionInEffect;
     RUNSKey1.SERVICESrecordID = SERVICES.recordID;
     RUNSKey1.runNumber = NO_RECORD;
-    RUNSKey1.runNumber = NO_RECORD;
+    RUNSKey1.pieceNumber = NO_RECORD;
     nJ = 0;
     rcode2 = btrieve(B_GETGREATER, TMS_RUNS, &RUNS, &RUNSKey1, 1);
     while(rcode2 == 0 &&
@@ -1068,23 +1068,50 @@ BOOL CDailyOps::OnInitDialog()
     RUNSKey1.DIVISIONSrecordID = m_DailyOpsRUNSDivisionInEffect;
     RUNSKey1.SERVICESrecordID = m_IncoreServices.pRecordIDs[nI];
     RUNSKey1.runNumber = NO_RECORD;
-    RUNSKey1.runNumber = NO_RECORD;
+    RUNSKey1.pieceNumber = NO_RECORD;
     nJ = 0;
     rcode2 = btrieve(B_GETGREATER, TMS_RUNS, &RUNS, &RUNSKey1, 1);
+//
+//  Cycle through the runs
+//
     while(rcode2 == 0 && 
           RUNS.DIVISIONSrecordID == m_DailyOpsRUNSDivisionInEffect &&
           RUNS.SERVICESrecordID == m_IncoreServices.pRecordIDs[nI])
     {
+//
+//  First piece only
+//
       if(RUNS.pieceNumber == 1)
       {
+//
+//  .recordID
+//
         m_pIncoreRuns[nI].pRuns[nJ].recordID = RUNS.recordID;
+//
+//  .runNumber
+//
         m_pIncoreRuns[nI].pRuns[nJ].runNumber = RUNS.runNumber;
+//
+//  .cutAsRuntype
+//
         m_pIncoreRuns[nI].pRuns[nJ].cutAsRuntype = RUNS.cutAsRuntype;
+//
+//  Call the RunCoster
+//
         SetupRun(m_pIncoreRuns[nI].pRuns[nJ].recordID, FALSE, &PROPOSEDRUN);
         m_pIncoreRuns[nI].pRuns[nJ].numPieces = PROPOSEDRUN.numPieces;
         RunCoster(&PROPOSEDRUN, m_pIncoreRuns[nI].pRuns[nJ].cutAsRuntype, &COST);
+//
+//  .startTRIPSrecordID
+//
         m_pIncoreRuns[nI].pRuns[nJ].startTRIPSrecordID = PROPOSEDRUN.piece[0].fromTRIPSrecordID;
+//
+//  .startNODESrecordID
+//
         m_pIncoreRuns[nI].pRuns[nJ].startNODESrecordID = PROPOSEDRUN.piece[0].fromNODESrecordID;
+//
+//  .szStartNodeName
+//
         NODESKey0.recordID = m_pIncoreRuns[nI].pRuns[nJ].startNODESrecordID;
         rcode2 = btrieve(B_GETEQUAL, TMS_NODES, &NODES, &NODESKey0, 0);
         if(rcode2 == 0)
@@ -1096,10 +1123,56 @@ BOOL CDailyOps::OnInitDialog()
         {
           strcpy(m_pIncoreRuns[nI].pRuns[nJ].szStartNodeName, "?");
         }
+//
+//  .startTime
+//
         m_pIncoreRuns[nI].pRuns[nJ].startTime = PROPOSEDRUN.piece[0].fromTime;
+//
+//  .reportAtNODESrecordID
+//
+        if(COST.TRAVEL[0].startNODESrecordID == NO_RECORD)
+        {
+          m_pIncoreRuns[nI].pRuns[nJ].reportAtNODESrecordID = m_pIncoreRuns[nI].pRuns[nJ].startNODESrecordID;
+        }
+        else
+        {
+          m_pIncoreRuns[nI].pRuns[nJ].reportAtNODESrecordID = COST.TRAVEL[0].startNODESrecordID;
+        }
+//
+//  .szReportAtNodeName
+//
+        NODESKey0.recordID = m_pIncoreRuns[nI].pRuns[nJ].reportAtNODESrecordID;
+        rcode2 = btrieve(B_GETEQUAL, TMS_NODES, &NODES, &NODESKey0, 0);
+        if(rcode2 == 0)
+        {
+          strncpy(m_pIncoreRuns[nI].pRuns[nJ].szReportAtNodeName, NODES.abbrName, NODES_ABBRNAME_LENGTH);
+          trim(m_pIncoreRuns[nI].pRuns[nJ].szReportAtNodeName, NODES_ABBRNAME_LENGTH);
+        }
+        else
+        {
+          strcpy(m_pIncoreRuns[nI].pRuns[nJ].szReportAtNodeName, "?");
+        }
+//
+//  .reportAtTime
+//
+        m_pIncoreRuns[nI].pRuns[nJ].reportAtTime = PROPOSEDRUN.piece[0].fromTime -
+              COST.PIECECOST[0].reportTime - COST.TRAVEL[0].startTravelTime;
+        if(PROPOSEDRUN.piece[0].prior.startTime != NO_TIME)
+        {
+          m_pIncoreRuns[nI].pRuns[nJ].reportAtTime -= PROPOSEDRUN.piece[0].prior.startTime;
+        }
+//
+//  .endTRIPSrecordID
+//
         nK = PROPOSEDRUN.numPieces - 1;
         m_pIncoreRuns[nI].pRuns[nJ].endTRIPSrecordID = PROPOSEDRUN.piece[nK].fromTRIPSrecordID;
+//
+//  .endNODESrecordID
+//
         m_pIncoreRuns[nI].pRuns[nJ].endNODESrecordID = PROPOSEDRUN.piece[nK].toNODESrecordID;
+//
+//  .szEndNodeName
+//
         NODESKey0.recordID = m_pIncoreRuns[nI].pRuns[nJ].endNODESrecordID;
         rcode2 = btrieve(B_GETEQUAL, TMS_NODES, &NODES, &NODESKey0, 0);
         if(rcode2 == 0)
@@ -1111,9 +1184,55 @@ BOOL CDailyOps::OnInitDialog()
         {
           strcpy(m_pIncoreRuns[nI].pRuns[nJ].szEndNodeName, "?");
         }
+//
+//  .endTime
+//
         m_pIncoreRuns[nI].pRuns[nJ].endTime = PROPOSEDRUN.piece[nK].toTime;
+//
+//  .turninAtNODESrecordID
+//
+        if(COST.TRAVEL[nK].endNODESrecordID == NO_RECORD)
+        {
+          m_pIncoreRuns[nI].pRuns[nJ].turninAtNODESrecordID = m_pIncoreRuns[nI].pRuns[nJ].endNODESrecordID;
+        }
+        else
+        {
+          m_pIncoreRuns[nI].pRuns[nJ].turninAtNODESrecordID = COST.TRAVEL[nK].endNODESrecordID;
+        }
+//
+//  .szTurninAtNodeName
+//
+        NODESKey0.recordID = m_pIncoreRuns[nI].pRuns[nJ].turninAtNODESrecordID;
+        rcode2 = btrieve(B_GETEQUAL, TMS_NODES, &NODES, &NODESKey0, 0);
+        if(rcode2 == 0)
+        {
+          strncpy(m_pIncoreRuns[nI].pRuns[nJ].szTurninAtNodeName, NODES.abbrName, NODES_ABBRNAME_LENGTH);
+          trim(m_pIncoreRuns[nI].pRuns[nJ].szTurninAtNodeName, NODES_ABBRNAME_LENGTH);
+        }
+        else
+        {
+          strcpy(m_pIncoreRuns[nI].pRuns[nJ].szTurninAtNodeName, "?");
+        }
+//
+//  .turninAtTime
+//
+        m_pIncoreRuns[nI].pRuns[nJ].turninAtTime = PROPOSEDRUN.piece[nK].toTime +
+              COST.PIECECOST[nK].turninTime + COST.TRAVEL[nK].endTravelTime;
+        if(PROPOSEDRUN.piece[nK].after.endTime != NO_TIME)
+        {
+          m_pIncoreRuns[nI].pRuns[nJ].turninAtTime += PROPOSEDRUN.piece[nK].after.endTime;
+        }
+//
+//  .payTime
+//
         m_pIncoreRuns[nI].pRuns[nJ].payTime = COST.TOTAL.payTime;
+//
+//  .flags
+//
         m_pIncoreRuns[nI].pRuns[nJ].flags = 0;
+//
+//  Reposition to get the next piece
+//
         RUNSKey0.recordID = m_pIncoreRuns[nI].pRuns[nJ].recordID;
         rcode2 = btrieve(B_GETEQUAL, TMS_RUNS, &RUNS, &RUNSKey0, 0);
         rcode2 = btrieve(B_GETPOSITION, TMS_RUNS, &RUNS, &RUNSKey0, 0);
@@ -1135,15 +1254,33 @@ BOOL CDailyOps::OnInitDialog()
     CREWONLYKey1.runNumber = NO_RECORD;
     CREWONLYKey1.pieceNumber = NO_RECORD;
     rcode2 = btrieve(B_GETGREATER, TMS_CREWONLY, &CREWONLY, &CREWONLYKey1, 1);
+//
+//  Cycle through the runs
+//
     while(rcode2 == 0 && 
           CREWONLY.DIVISIONSrecordID == m_DailyOpsRUNSDivisionInEffect &&
           CREWONLY.SERVICESrecordID == m_IncoreServices.pRecordIDs[nI])
     {
+//
+//  First piece only
+//
       if(CREWONLY.pieceNumber == 1)
       {
+//
+//  .recordID
+//
         m_pIncoreRuns[nI].pRuns[nJ].recordID = CREWONLY.recordID;
+//
+//  .runNumber
+//
         m_pIncoreRuns[nI].pRuns[nJ].runNumber = CREWONLY.runNumber;
+//
+//  .cutAsRuntype
+//
         m_pIncoreRuns[nI].pRuns[nJ].cutAsRuntype = CREWONLY.cutAsRuntype;
+//
+//  Get ready to call the RunCoster
+//
         pieceNumber = 0;
         RUNSrecordID = CREWONLY.recordID;
         runNumber = CREWONLY.runNumber;
@@ -1171,10 +1308,22 @@ BOOL CDailyOps::OnInitDialog()
           rcode2 = btrieve(B_GETNEXT, TMS_CREWONLY, &CREWONLY, &CREWONLYKey1, 1);
           pieceNumber++;
         }
+//
+//  Cost the crew-only run
+//
         m_pIncoreRuns[nI].pRuns[nJ].numPieces = pieceNumber;
         RunCoster(&PROPOSEDRUN, m_pIncoreRuns[nI].pRuns[nJ].cutAsRuntype, &COST);
+//
+//  .startTRIPSrecordID
+//
         m_pIncoreRuns[nI].pRuns[nJ].startTRIPSrecordID = NO_RECORD;
+//
+//  .startNODESrecordID
+//
         m_pIncoreRuns[nI].pRuns[nJ].startNODESrecordID = PROPOSEDRUN.piece[0].fromNODESrecordID;
+//
+//  .szStartNodeName
+//
         NODESKey0.recordID = m_pIncoreRuns[nI].pRuns[nJ].startNODESrecordID;
         rcode2 = btrieve(B_GETEQUAL, TMS_NODES, &NODES, &NODESKey0, 0);
         if(rcode2 == 0)
@@ -1186,10 +1335,52 @@ BOOL CDailyOps::OnInitDialog()
         {
           strcpy(m_pIncoreRuns[nI].pRuns[nJ].szStartNodeName, "?");
         }
-        nK = pieceNumber - 1;
+//
+//  .startTime
+//
         m_pIncoreRuns[nI].pRuns[nJ].startTime = PROPOSEDRUN.piece[0].fromTime;
+//
+//  .reportAtNODESrecordID
+//
+        if(COST.TRAVEL[0].startNODESrecordID == NO_RECORD)
+        {
+          m_pIncoreRuns[nI].pRuns[nJ].reportAtNODESrecordID = m_pIncoreRuns[nI].pRuns[nJ].startNODESrecordID;
+        }
+        else
+        {
+          m_pIncoreRuns[nI].pRuns[nJ].reportAtNODESrecordID = COST.TRAVEL[0].startNODESrecordID;
+        }
+//
+//  .szReportAtNodeName
+//
+        NODESKey0.recordID = m_pIncoreRuns[nI].pRuns[nJ].reportAtNODESrecordID;
+        rcode2 = btrieve(B_GETEQUAL, TMS_NODES, &NODES, &NODESKey0, 0);
+        if(rcode2 == 0)
+        {
+          strncpy(m_pIncoreRuns[nI].pRuns[nJ].szReportAtNodeName, NODES.abbrName, NODES_ABBRNAME_LENGTH);
+          trim(m_pIncoreRuns[nI].pRuns[nJ].szReportAtNodeName, NODES_ABBRNAME_LENGTH);
+        }
+        else
+        {
+          strcpy(m_pIncoreRuns[nI].pRuns[nJ].szReportAtNodeName, "?");
+        }
+//
+//  .reportAtTime
+//
+        m_pIncoreRuns[nI].pRuns[nJ].reportAtTime = PROPOSEDRUN.piece[0].fromTime -
+              COST.PIECECOST[0].reportTime - COST.TRAVEL[0].startTravelTime;
+//
+//  .endTRIPSrecordID
+//
+        nK = pieceNumber - 1;
         m_pIncoreRuns[nI].pRuns[nJ].endTRIPSrecordID = NO_RECORD;
+//
+//  .endNODESrecordID
+//
         m_pIncoreRuns[nI].pRuns[nJ].endNODESrecordID = PROPOSEDRUN.piece[nK].toNODESrecordID;
+//
+//  .szEndNodeName
+//
         NODESKey0.recordID = m_pIncoreRuns[nI].pRuns[nJ].endNODESrecordID;
         rcode2 = btrieve(B_GETEQUAL, TMS_NODES, &NODES, &NODESKey0, 0);
         if(rcode2 == 0)
@@ -1201,9 +1392,51 @@ BOOL CDailyOps::OnInitDialog()
         {
           strcpy(m_pIncoreRuns[nI].pRuns[nJ].szEndNodeName, "?");
         }
+//
+//  .endTime
+//
         m_pIncoreRuns[nI].pRuns[nJ].endTime = PROPOSEDRUN.piece[nK].toTime;
+//
+//  .turninAtNODESrecordID
+//
+        if(COST.TRAVEL[nK].endNODESrecordID == NO_RECORD)
+        {
+          m_pIncoreRuns[nI].pRuns[nJ].turninAtNODESrecordID = m_pIncoreRuns[nI].pRuns[nJ].endNODESrecordID;
+        }
+        else
+        {
+          m_pIncoreRuns[nI].pRuns[nJ].turninAtNODESrecordID = COST.TRAVEL[nK].endNODESrecordID;
+        }
+//
+//  .szTurninAtNodeName
+//
+        NODESKey0.recordID = m_pIncoreRuns[nI].pRuns[nJ].turninAtNODESrecordID;
+        rcode2 = btrieve(B_GETEQUAL, TMS_NODES, &NODES, &NODESKey0, 0);
+        if(rcode2 == 0)
+        {
+          strncpy(m_pIncoreRuns[nI].pRuns[nJ].szTurninAtNodeName, NODES.abbrName, NODES_ABBRNAME_LENGTH);
+          trim(m_pIncoreRuns[nI].pRuns[nJ].szTurninAtNodeName, NODES_ABBRNAME_LENGTH);
+        }
+        else
+        {
+          strcpy(m_pIncoreRuns[nI].pRuns[nJ].szTurninAtNodeName, "?");
+        }
+//
+//  .turninAtTime
+//
+        m_pIncoreRuns[nI].pRuns[nJ].turninAtTime = PROPOSEDRUN.piece[nK].toTime +
+              COST.PIECECOST[nK].turninTime + COST.TRAVEL[nK].endTravelTime;
+//
+//  .payTime
+//
         m_pIncoreRuns[nI].pRuns[nJ].payTime = COST.TOTAL.payTime;
+//
+//  .flags
+//
         m_pIncoreRuns[nI].pRuns[nJ].flags = RDATA_FLAG_CREWONLY;
+//
+//  Reposition to the next run
+//
         CREWONLYKey0.recordID = m_pIncoreRuns[nI].pRuns[nJ].recordID;
         rcode2 = btrieve(B_GETEQUAL, TMS_CREWONLY, &CREWONLY, &CREWONLYKey0, 0);
         rcode2 = btrieve(B_GETPOSITION, TMS_CREWONLY, &CREWONLY, &CREWONLYKey0, 0);
@@ -1677,19 +1910,18 @@ BOOL CDailyOps::OnInitDialog()
     for(nI = 0; nI < m_numInCheckIn; nI++)
     {
       DAILYOPSKey3.DRIVERSrecordID = m_CheckIn[nI].DRIVERSrecordID;
-      DAILYOPSKey3.recordTypeFlag = DAILYOPS_FLAG_OPERATOR;
       DAILYOPSKey3.pertainsToDate = m_DailyOpsDateYYYYMMDD;
-      DAILYOPSKey3.pertainsToTime = NO_RECORD;
-      DAILYOPSKey3.recordFlags = 0;
+      DAILYOPSKey3.pertainsToTime = NO_TIME;
+      DAILYOPSKey3.recordTypeFlag = NO_RECORD;
+      DAILYOPSKey3.recordFlags = NO_RECORD;
       bFound = FALSE;
       bAdjust = FALSE;
       rcode2 = btrieve(B_GETGREATER, TMS_DAILYOPS, &DAILYOPS, &DAILYOPSKey3, 3);
       while(rcode2 == 0 &&
             (DAILYOPS.DRIVERSrecordID == m_CheckIn[nI].DRIVERSrecordID) &&
-            (DAILYOPS.recordTypeFlag & DAILYOPS_FLAG_OPERATOR) &&
             (DAILYOPS.pertainsToDate == m_DailyOpsDateYYYYMMDD))
       {
-        if(DAILYOPS.recordFlags & DAILYOPS_FLAG_OPERATORCHECKIN)
+        if((DAILYOPS.recordTypeFlag & DAILYOPS_FLAG_OPERATOR) && (DAILYOPS.recordFlags & DAILYOPS_FLAG_OPERATORCHECKIN))
         {
           if(!ANegatedRecord(DAILYOPS.recordID, 3))
           {
@@ -2516,10 +2748,14 @@ void CDailyOps::PopulateOpenWorkMonitor(long date, BOOL bRefresh, BOOL bDisplay)
           m_pRData[numRuns].recordID = m_pIncoreRuns[serviceIndex].pRuns[runIndex].recordID;
           m_pRData[numRuns].runNumber = m_pIncoreRuns[serviceIndex].pRuns[runIndex].runNumber;
           m_pRData[numRuns].cutAsRuntype = m_pIncoreRuns[serviceIndex].pRuns[runIndex].cutAsRuntype;
-          m_pRData[numRuns].onNODESrecordID = m_pIncoreRuns[serviceIndex].pRuns[runIndex].startNODESrecordID;
-          m_pRData[numRuns].onTime = m_pIncoreRuns[serviceIndex].pRuns[runIndex].startTime;
-          m_pRData[numRuns].offNODESrecordID = m_pIncoreRuns[serviceIndex].pRuns[runIndex].endNODESrecordID;
-          m_pRData[numRuns].offTime = m_pIncoreRuns[serviceIndex].pRuns[runIndex].endTime;
+//          m_pRData[numRuns].onNODESrecordID = m_pIncoreRuns[serviceIndex].pRuns[runIndex].startNODESrecordID;
+//          m_pRData[numRuns].onTime = m_pIncoreRuns[serviceIndex].pRuns[runIndex].startTime;
+          m_pRData[numRuns].onNODESrecordID = m_pIncoreRuns[serviceIndex].pRuns[runIndex].reportAtNODESrecordID;
+          m_pRData[numRuns].onTime = m_pIncoreRuns[serviceIndex].pRuns[runIndex].reportAtTime;
+//          m_pRData[numRuns].offNODESrecordID = m_pIncoreRuns[serviceIndex].pRuns[runIndex].endNODESrecordID;
+//          m_pRData[numRuns].offTime = m_pIncoreRuns[serviceIndex].pRuns[runIndex].endTime;
+          m_pRData[numRuns].offNODESrecordID = m_pIncoreRuns[serviceIndex].pRuns[runIndex].turninAtNODESrecordID;
+          m_pRData[numRuns].offTime = m_pIncoreRuns[serviceIndex].pRuns[runIndex].turninAtTime;
           m_pRData[numRuns].DRIVERSrecordID = NO_RECORD;
           m_pRData[numRuns].pay = m_pIncoreRuns[serviceIndex].pRuns[runIndex].payTime;
           m_pRData[numRuns].flags = 0;
@@ -2552,10 +2788,14 @@ void CDailyOps::PopulateOpenWorkMonitor(long date, BOOL bRefresh, BOOL bDisplay)
           m_pRData[numRuns].recordID = m_pIncoreRuns[serviceIndex].pRuns[runIndex].recordID;
           m_pRData[numRuns].runNumber = m_pIncoreRuns[serviceIndex].pRuns[runIndex].runNumber;
           m_pRData[numRuns].cutAsRuntype = m_pIncoreRuns[serviceIndex].pRuns[runIndex].cutAsRuntype;
-          m_pRData[numRuns].onNODESrecordID = m_pIncoreRuns[serviceIndex].pRuns[runIndex].startNODESrecordID;
-          m_pRData[numRuns].onTime = m_pIncoreRuns[serviceIndex].pRuns[runIndex].startTime;
-          m_pRData[numRuns].offNODESrecordID = m_pIncoreRuns[serviceIndex].pRuns[runIndex].endNODESrecordID;
-          m_pRData[numRuns].offTime = m_pIncoreRuns[serviceIndex].pRuns[runIndex].endTime;
+//          m_pRData[numRuns].onNODESrecordID = m_pIncoreRuns[serviceIndex].pRuns[runIndex].startNODESrecordID;
+//          m_pRData[numRuns].onTime = m_pIncoreRuns[serviceIndex].pRuns[runIndex].startTime;
+          m_pRData[numRuns].onNODESrecordID = m_pIncoreRuns[serviceIndex].pRuns[runIndex].reportAtNODESrecordID;
+          m_pRData[numRuns].onTime = m_pIncoreRuns[serviceIndex].pRuns[runIndex].reportAtTime;
+//          m_pRData[numRuns].offNODESrecordID = m_pIncoreRuns[serviceIndex].pRuns[runIndex].endNODESrecordID;
+//          m_pRData[numRuns].offTime = m_pIncoreRuns[serviceIndex].pRuns[runIndex].endTime;
+          m_pRData[numRuns].offNODESrecordID = m_pIncoreRuns[serviceIndex].pRuns[runIndex].turninAtNODESrecordID;
+          m_pRData[numRuns].offTime = m_pIncoreRuns[serviceIndex].pRuns[runIndex].turninAtTime;
           m_pRData[numRuns].DRIVERSrecordID = NO_RECORD;
           m_pRData[numRuns].pay = m_pIncoreRuns[serviceIndex].pRuns[runIndex].payTime;
           m_pRData[numRuns].flags = RDATA_FLAG_CREWONLY;
@@ -3376,6 +3616,10 @@ long CDailyOps::SetupRun(long RUNSrecordID, BOOL bCrewOnly, PROPOSEDRUNDef* pPR)
         pPR->piece[(int)pieceNumber].toTime = offTime;
         pPR->piece[(int)pieceNumber].toNODESrecordID = RUNS.end.NODESrecordID;
         pPR->piece[(int)pieceNumber].toTRIPSrecordID = RUNS.end.TRIPSrecordID;
+        pPR->piece[(int)pieceNumber].prior.startTime = RUNS.prior.startTime;
+        pPR->piece[(int)pieceNumber].prior.endTime = RUNS.prior.endTime;
+        pPR->piece[(int)pieceNumber].after.startTime = RUNS.after.startTime;
+        pPR->piece[(int)pieceNumber].after.endTime = RUNS.after.endTime;
         pieceNumber++;
       }
       rcode2 = btrieve(B_GETNEXT, TMS_RUNS, &RUNS, &RUNSKey1, 1);
@@ -4153,13 +4397,23 @@ void CDailyOps::OnDblclkOpenworklist(NMHDR* pNMHDR, LRESULT* pResult)
       {
         m_LastDAILYOPSRecordID = DAILYOPS.recordID;
       }
-      DAILYOPSrecordID = DAILYOPS.recordID;
+//
+//  Send the data out in real time
+//
+      if(m_bUseStrategicMapping)
+      {
+        HCURSOR hSaveCursor = SetCursor(hCursorWait);
+
+//        m_DeleteAssignment(DAILYOPSrecordID);
+        SetCursor(hSaveCursor);
+      }
 //
 //  Clear the name on the display and disable the Clear button
 //  
       pListCtrlOPENWORKLIST->SetItemText(m_SelectedOWRow, 8, "");
       pOW->DRIVERSrecordID = NO_RECORD;
       response = IDOK;  // fake out for later
+      DAILYOPSrecordID = DAILYOPS.recordID;
     }
   }
 //
@@ -4246,6 +4500,43 @@ void CDailyOps::OnDblclkOpenworklist(NMHDR* pNMHDR, LRESULT* pResult)
         m_LastDAILYOPSRecordID = DAILYOPS.recordID;
       }
       pOW->DRIVERSrecordID = DRIVERSrecordID;
+//
+//  Send the data out in real time
+//
+      if(m_bUseStrategicMapping || m_bUseConnexionz)
+      {
+        PROPOSEDRUNDef PROPOSEDRUN;
+        COSTDef        COST;
+        long year, month, day;
+        long hours, minutes;
+        long pieceNumber;
+        int  numPieces;
+        int  nI;
+        char szParm6[32];
+
+        GetYMD(m_DailyOpsDateYYYYMMDD, &year, &month, &day);
+        hours = pOW->onTime / 3600;
+        minutes = (pOW->onTime / 60) % 60;
+
+        sprintf(szParm6, "%4d-%02d-%02dT%02d:%02d:00", year, month, day, hours, minutes); 
+        RUNSKey0.recordID = pOW->RUNSrecordID;
+        btrieve(B_GETEQUAL, TMS_RUNS, &RUNS, &RUNSKey0, 0);
+        btrieve(B_GETPOSITION, TMS_RUNS, &RUNS, &RUNSKey0, 0);
+        btrieve(B_GETDIRECT, TMS_RUNS, &RUNS, &RUNSKey1, 1);
+        numPieces = GetRunElements(hWndMain, &RUNS, &PROPOSEDRUN, &COST, TRUE);
+        pieceNumber = 1;
+        for(nI = 0; nI < numPieces; nI++)
+        {
+          if(pOW->onTime > RUNSVIEW[nI].runOnTime)
+          {
+            continue;
+          }
+          pieceNumber = nI + 1;
+          break;
+        }
+//        m_AddAssignment(DAILYOPS.recordID, pOW->DRIVERSrecordID, pOW->RUNSrecordID,
+//               pieceNumber, pOW->runNumber, NO_RECORD, szParm6);
+      }
     }
   }
 
@@ -5924,38 +6215,107 @@ void CDailyOps::OnAssignbus()
   {
     m_LastDAILYOPSRecordID = DAILYOPS.recordID;
   }
+
+  long DAILYOPSrecordID = DAILYOPS.recordID;
 //
 //  Send the data out in real time
 //
   if(m_bUseStrategicMapping || m_bUseConnexionz)
   {
-    char szParm6[32];
+    TripInfoDef TripInfo[500];
     HCURSOR hSaveCursor = SetCursor(hCursorWait);
     long SystemDate = m_SystemTime.GetYear() * 10000 + m_SystemTime.GetMonth() * 100 + m_SystemTime.GetDay();
+    long year, month, day;
+    long hours, minutes;
+    char szParm6[32];
+    int  numInTripInfo;
+//
+//  Go through the assignments
+//
+    long DRIVERSrecordID;
     long pieceNumber;
+    int  nI;
 
-    if(m_DailyOpsDateYYYYMMDD == SystemDate)
+    numInTripInfo = BuildTripInfo(TripInfo, m_BlockInfo[m_SelectedBlockIndex]);
+
+    GetYMD(m_DailyOpsDateYYYYMMDD, &year, &month, &day);
+    for(nI = 0; nI < numInTripInfo; nI++)
     {
-      sprintf(szParm6, "%4d-%02d-%02dT%02d:%02d:%02d", 
-            m_SystemTime.GetYear(), m_SystemTime.GetMonth(), m_SystemTime.GetDay(),
-            m_SystemTime.GetHour(), m_SystemTime.GetMinute(), m_SystemTime.GetSecond());
+      RUNSKey0.recordID = NO_RECORD;
+      if(nI == 0)
+      {
+        RUNSKey0.recordID = TripInfo[nI].RUNSrecordID[0];
+        pieceNumber = TripInfo[nI].pieceNumber[0];
+        DRIVERSrecordID = TripInfo[nI].DRIVERSrecordID[0];
+      }
+      else
+      {
+        if(TripInfo[nI].RUNSrecordID[1] != NO_RECORD)
+        {
+          RUNSKey0.recordID = TripInfo[nI].RUNSrecordID[1];
+          pieceNumber = TripInfo[nI].pieceNumber[1];
+          DRIVERSrecordID = TripInfo[nI].DRIVERSrecordID[1];
+        }
+      }
+      if(RUNSKey0.recordID != NO_RECORD)
+      {
+        rcode2 = btrieve(B_GETEQUAL, TMS_RUNS, &RUNS, &RUNSKey0, 0);
+        if(rcode2 == 0)
+        {
+//
+//  Record the assignment
+//
+          DailyOpsBuildRecord(&DAILYOPS, DAILYOPS_FLAG_BUS);
+          DAILYOPS.recordFlags = DAILYOPS_FLAG_BUSOPERATORASSIGNMENT;
+          DAILYOPS.pertainsToDate = m_DailyOpsDateYYYYMMDD;
+          DAILYOPS.pertainsToTime = DAILYOPS.recordID;
+          DAILYOPS.DRIVERSrecordID = DRIVERSrecordID;
+          DAILYOPS.DOPS.Bus.BUSESrecordID = m_BlockInfo[m_SelectedBlockIndex].BUSESrecordID;
+          DAILYOPS.DOPS.Bus.TRIPSrecordID = m_BlockInfo[m_SelectedBlockIndex].TRIPSrecordID;
+          DAILYOPS.DOPS.Bus.RGRPROUTESrecordID = m_BlockInfo[m_SelectedBlockIndex].RGRPROUTESrecordID;
+          DAILYOPS.DOPS.Bus.SGRPSERVICESrecordID = m_BlockInfo[m_SelectedBlockIndex].SGRPSERVICESrecordID;
+          DAILYOPS.DOPS.Bus.newBUSESrecordID = NO_RECORD;
+          DAILYOPS.DOPS.Bus.swapReasonIndex = NO_RECORD;
+          DAILYOPS.DOPS.Bus.locationNODESrecordID = NO_RECORD;
+          DAILYOPS.DOPS.Bus.RUNSrecordID = RUNS.recordID;
+          DAILYOPS.DOPS.Bus.untilTime = m_SelectedBlockIndex;
+          rcode2 = btrieve(B_INSERT, TMS_DAILYOPS, &DAILYOPS, &DAILYOPSKey0, 0);
+          if(rcode2 == 0)
+          {
+            m_LastDAILYOPSRecordID = DAILYOPS.recordID;
+//
+//  The first time out is the Pull-out.  After that, it's the relief time
+//
+            if(nI == 0)
+            {
+              hours = m_BlockInfo[m_SelectedBlockIndex].POTime / 3600;
+              minutes = (m_BlockInfo[m_SelectedBlockIndex].POTime / 60) % 60;
+            }
+            else
+            {
+//              hours = TripInfo[nI].fromTime / 3600;
+//              minutes = (TripInfo[nI].fromTime / 60) % 60;
+              hours = TripInfo[nI].reliefAtTime / 3600;
+              minutes = (TripInfo[nI].reliefAtTime / 60) % 60;
+            }
+//
+//  We have an hour leeway on the assignment
+//
+            CTime timeThen = CTime(year, month, day, hours, minutes, 0);
+            CTime timeNow = CTime::GetCurrentTime();
+//            if(timeNow > timeNow + CTimeSpan(0, 0, 0, 1))
+            if(timeNow > timeThen + CTimeSpan(0, 0, 0, 1))
+            {
+              hours = timeNow.GetHour();
+              minutes = timeNow.GetMinute();
+            }
+            sprintf(szParm6, "%4d-%02d-%02dT%02d:%02d:00", year, month, day, hours, minutes); 
+            m_AddAssignment(DAILYOPS.recordID, DRIVERSrecordID, RUNS.recordID,
+                   pieceNumber, RUNS.runNumber, DAILYOPS.DOPS.Bus.BUSESrecordID, szParm6);
+          }
+        }
+      }
     }
-    else
-    {
-      long year, month, day;
-      long hours, minutes;
-
-      GetYMD(m_DailyOpsDateYYYYMMDD, &year, &month, &day);
-      hours = m_BlockInfo[m_SelectedBlockIndex].POTime / 3600;
-      minutes = (m_BlockInfo[m_SelectedBlockIndex].POTime / 60) % 60;
-
-      sprintf(szParm6, "%4d-%02d-%02dT%02d:%02d:00", year, month, day, hours, minutes); 
-    }
-    RUNSKey0.recordID = m_BlockInfo[m_SelectedBlockIndex].startingRUNSrecordID;
-    rcode2 = btrieve(B_GETEQUAL, TMS_RUNS, &RUNS, &RUNSKey0, 0);
-    pieceNumber = (rcode2 == 0 ? RUNS.pieceNumber : 1);
-    m_AddAssignment(DAILYOPS.recordID, m_BlockInfo[m_SelectedBlockIndex].startingDRIVERSrecordID, RUNS.recordID,
-           pieceNumber, m_BlockInfo[m_SelectedBlockIndex].startingRunNumber, DAILYOPS.DOPS.Bus.BUSESrecordID, szParm6);
     SetCursor(hSaveCursor);
   }
 //
@@ -5963,7 +6323,7 @@ void CDailyOps::OnAssignbus()
 //
   RefreshBlockList(m_SelectedBlockIndex);
   m_pPEGBOARD[m_PegboardIndex].flags = PEGBOARD_FLAG_BUSISASSIGNED;
-  m_pPEGBOARD[m_PegboardIndex].DAILYOPSrecordID = DAILYOPS.recordID;
+  m_pPEGBOARD[m_PegboardIndex].DAILYOPSrecordID = DAILYOPSrecordID;
   m_pPEGBOARD[m_PegboardIndex].indexToBlockInfo = m_SelectedBlockIndex;
 //
 //  Fix the display
@@ -5977,6 +6337,8 @@ void CDailyOps::OnReturn()
   m_PreviousTime = m_SystemTime;
 
   CString s;
+  long DAILYOPSrecordID;
+  long DRIVERSrecordID;
   int  rcode2;
 //
 //  Record the return
@@ -6004,7 +6366,44 @@ void CDailyOps::OnReturn()
   {
     HCURSOR hSaveCursor = SetCursor(hCursorWait);
 
-    m_DeleteAssignment(DAILYOPS.DAILYOPSrecordID);
+//    m_DeleteAssignment(DAILYOPS.DAILYOPSrecordID);
+    DAILYOPSKey1.recordTypeFlag = DAILYOPS_FLAG_BUS;
+    DAILYOPSKey1.pertainsToDate = m_DailyOpsDateYYYYMMDD;
+    DAILYOPSKey1.pertainsToTime = NO_TIME;
+    DAILYOPSKey1.recordFlags = 0;
+    rcode2 = btrieve(B_GETGREATER, TMS_DAILYOPS, &DAILYOPS, &DAILYOPSKey1, 1);
+    while(rcode2 == 0 &&
+          (DAILYOPS.pertainsToDate == m_DailyOpsDateYYYYMMDD))
+    {
+      if(!ANegatedRecord(DAILYOPS.recordID, 1))
+      {
+        if((DAILYOPS.recordTypeFlag & DAILYOPS_FLAG_BUS) &&
+              (DAILYOPS.recordFlags & DAILYOPS_FLAG_BUSOPERATORASSIGNMENT) &&
+              (DAILYOPS.DOPS.Bus.BUSESrecordID == m_pPEGBOARD[m_PegboardIndex].BUSESrecordID) &&
+              (DAILYOPS.DOPS.Bus.untilTime == m_pPEGBOARD[m_PegboardIndex].indexToBlockInfo))
+        {
+          m_DeleteAssignment(DAILYOPS.recordID);
+          DAILYOPSrecordID = DAILYOPS.recordID;
+          DRIVERSrecordID = DAILYOPS.DRIVERSrecordID;
+          DailyOpsBuildRecord(&DAILYOPS, DAILYOPS_FLAG_BUS);
+          DAILYOPS.recordFlags = DAILYOPS_FLAG_BUSOPERATORDEASSIGNMENT;
+          DAILYOPS.pertainsToDate = m_DailyOpsDateYYYYMMDD;
+          DAILYOPS.pertainsToTime = DAILYOPSrecordID;
+          DAILYOPS.DRIVERSrecordID = DRIVERSrecordID;
+          DAILYOPS.DOPS.Bus.BUSESrecordID = m_BlockInfo[m_SelectedBlockIndex].BUSESrecordID;
+          rcode2 = btrieve(B_INSERT, TMS_DAILYOPS, &DAILYOPS, &DAILYOPSKey0, 0);
+          if(rcode2 == 0)
+          {
+            m_LastDAILYOPSRecordID = DAILYOPS.recordID;
+          }
+          DAILYOPSKey0.recordID = DAILYOPSrecordID;
+          rcode2 = btrieve(B_GETEQUAL, TMS_DAILYOPS, &DAILYOPS, &DAILYOPSKey0, 0);
+          rcode2 = btrieve(B_GETPOSITION, TMS_DAILYOPS, &DAILYOPS, &DAILYOPSKey0, 0);
+          rcode2 = btrieve(B_GETDIRECT, TMS_DAILYOPS, &DAILYOPS, &DAILYOPSKey1, 1);
+        }
+      }
+      rcode2 = btrieve(B_GETNEXT, TMS_DAILYOPS, &DAILYOPS, &DAILYOPSKey1, 1);
+    }
     SetCursor(hSaveCursor);
   }
 //
@@ -6475,6 +6874,9 @@ void CDailyOps::OnAllBlocks()
 
 void CDailyOps::OnBlocksProperties() 
 {
+  TripInfoDef TripInfo[500];
+  int         numInTripInfo;
+
   m_PreviousTime = m_SystemTime;
 
   LVITEM LVI;
@@ -6500,9 +6902,14 @@ void CDailyOps::OnBlocksProperties()
     return;
   }
 
-  CDailyOpsBP dlg(this, &m_BlockInfo[m_SelectedBlockIndex], m_DailyOpsDate);
+  numInTripInfo = BuildTripInfo(TripInfo, m_BlockInfo[m_SelectedBlockIndex]);
 
-  dlg.DoModal();
+  if(numInTripInfo > 0)
+  {
+    CDailyOpsBP dlg(this, TripInfo, numInTripInfo);
+
+    dlg.DoModal();
+  }
 }
 
 //
@@ -7940,3 +8347,368 @@ void CDailyOps::GetOWMPointer(int row, OPENWORKDef** pOW)
   pListCtrlOPENWORKLIST->GetItem(&LVI);
   *pOW = (OPENWORKDef *)LVI.lParam;
 }
+
+int CDailyOps::BuildTripInfo(TripInfoDef* pTI, BlockInfoDef BlockInfo)
+{
+  int numInTripInfo;
+//
+//  Build the pTI structure
+//
+  int keyNumber = 2;
+
+  TRIPSKey0.recordID = BlockInfo.TRIPSrecordID;
+  btrieve(B_GETEQUAL, TMS_TRIPS, &TRIPS, &TRIPSKey0, 0);
+
+  GenerateTripDef GTResults;
+  BLOCKSDef *pTRIPSChunk = keyNumber == 2 ? &TRIPS.standard : &TRIPS.dropback;
+  long startTRIPSrecordID = NO_RECORD;
+  long endTRIPSrecordID = NO_RECORD;
+  long previousRUNSrecordID = NO_RECORD;
+  long previousRunNumber = NO_RECORD;
+  long previousPieceNumber = NO_RECORD;
+  long previousRosterNumber = NO_RECORD;
+  long RUNSrecordID;
+  long runNumber;
+  char *ptr = NULL;
+  long assignedToNODESrecordID = TRIPS.standard.assignedToNODESrecordID;
+  long reliefAtNODESrecordID;
+  long patternIndex;
+  BOOL bFound;
+  BOOL bCrewOnly;
+  int  rcode2;
+  int  nI, nJ;
+
+  numInTripInfo = 0;
+  TRIPSKey2.assignedToNODESrecordID = assignedToNODESrecordID;
+  TRIPSKey2.RGRPROUTESrecordID = BlockInfo.RGRPROUTESrecordID;
+  TRIPSKey2.SGRPSERVICESrecordID = BlockInfo.SGRPSERVICESrecordID;
+  TRIPSKey2.blockNumber = BlockInfo.blockNumber;
+  TRIPSKey2.blockSequence = NO_RECORD;
+  rcode2 = btrieve(B_GETGREATER, TMS_TRIPS, &TRIPS, &TRIPSKey2, keyNumber);
+  while(rcode2 == 0 &&
+        pTRIPSChunk->assignedToNODESrecordID == assignedToNODESrecordID &&
+        pTRIPSChunk->RGRPROUTESrecordID == BlockInfo.RGRPROUTESrecordID &&
+        pTRIPSChunk->SGRPSERVICESrecordID == BlockInfo.SGRPSERVICESrecordID &&
+        pTRIPSChunk->blockNumber == BlockInfo.blockNumber)
+  {
+    GenerateTrip(TRIPS.ROUTESrecordID, TRIPS.SERVICESrecordID,
+          TRIPS.directionIndex, TRIPS.PATTERNNAMESrecordID,
+          TRIPS.timeAtMLP, GENERATETRIP_FLAG_DISPLAYERRORS, &GTResults);
+
+    reliefAtNODESrecordID = NO_RECORD;
+//
+//  TRIPSrecordID
+//
+    pTI[numInTripInfo].TRIPSrecordID = TRIPS.recordID;
+//
+//  Trip number
+//
+    pTI[numInTripInfo].tripNumber = TRIPS.tripNumber;
+//
+//  Status
+//
+    pTI[numInTripInfo].flags = TRIPINFO_FLAG_OK;
+//
+//  Run number
+//
+//  If need be, locate the trip in the Runs Table
+//
+    for(nI = 0; nI < MAXRELIEFSPERTRIP; nI++)
+    {
+      pTI[numInTripInfo].runNumber[nI] = NO_RECORD;
+      pTI[numInTripInfo].RUNSrecordID[nI] = NO_RECORD;
+    }
+    reliefAtNODESrecordID = NO_RECORD;
+    bFound = FALSE;
+    if(startTRIPSrecordID == NO_RECORD || TRIPS.recordID == endTRIPSrecordID)
+    {
+      RUNSKey1.DIVISIONSrecordID = m_DailyOpsRUNSDivisionInEffect;
+      RUNSKey1.SERVICESrecordID = BlockInfo.SGRPSERVICESrecordID;
+      RUNSKey1.runNumber = NO_RECORD;
+      RUNSKey1.pieceNumber = NO_RECORD;
+      rcode2 = btrieve(B_GETGREATER, TMS_RUNS, &RUNS, &RUNSKey1, 1);
+      while(rcode2 == 0 &&
+            RUNS.DIVISIONSrecordID == m_DailyOpsRUNSDivisionInEffect &&
+            RUNS.SERVICESrecordID == BlockInfo.SGRPSERVICESrecordID)
+      {
+        if(RUNS.start.TRIPSrecordID == TRIPS.recordID)
+        {
+          startTRIPSrecordID = RUNS.start.TRIPSrecordID;
+          endTRIPSrecordID = RUNS.end.TRIPSrecordID;
+          bFound = TRUE;
+          break;
+        }
+        rcode2 = btrieve(B_GETNEXT, TMS_RUNS, &RUNS, &RUNSKey1, 1);
+      }
+    }
+    if(bFound)
+    {
+      RUNSrecordID = RUNS.recordID;
+      runNumber = RUNS.runNumber;
+      if(previousRunNumber != NO_RECORD)
+      {
+        pTI[numInTripInfo].runNumber[0] = previousRunNumber;
+        pTI[numInTripInfo].runNumber[1] = RUNS.runNumber;
+        pTI[numInTripInfo].pieceNumber[0] = previousPieceNumber;
+        pTI[numInTripInfo].pieceNumber[1] = RUNS.pieceNumber;
+        pTI[numInTripInfo].RUNSrecordID[0] = previousRUNSrecordID;
+        pTI[numInTripInfo].RUNSrecordID[1] = RUNS.recordID;
+        reliefAtNODESrecordID = RUNS.start.NODESrecordID;
+      }
+      else
+      {
+        pTI[numInTripInfo].runNumber[0] = RUNS.runNumber;
+        pTI[numInTripInfo].pieceNumber[0] = RUNS.pieceNumber;
+        pTI[numInTripInfo].RUNSrecordID[0] = RUNS.recordID;
+      }
+      previousRunNumber = RUNS.runNumber;
+      previousPieceNumber = RUNS.pieceNumber;
+      previousRUNSrecordID = RUNS.recordID;
+    }
+    else
+    {
+      pTI[numInTripInfo].runNumber[0] = previousRunNumber;
+      pTI[numInTripInfo].pieceNumber[0] = previousPieceNumber;
+      pTI[numInTripInfo].RUNSrecordID[0] = previousRUNSrecordID;
+    }
+//
+//  Roster number
+//
+    pTI[numInTripInfo].rosterNumber[0] = NO_RECORD;
+    pTI[numInTripInfo].rosterNumber[1] = NO_RECORD;
+    if(bFound)
+    {
+      if(previousRosterNumber != NO_RECORD)
+      {
+        pTI[numInTripInfo].rosterNumber[0] = previousRosterNumber;
+      }
+      ROSTERKey1.DIVISIONSrecordID = m_DailyOpsROSTERDivisionInEffect;
+      ROSTERKey1.rosterNumber = NO_RECORD;
+      rcode2 = btrieve(B_GETGREATER, TMS_ROSTER, &ROSTER, &ROSTERKey1, 1);
+      while(rcode2 == 0 &&
+            ROSTER.DIVISIONSrecordID == m_DailyOpsROSTERDivisionInEffect)
+      {
+        bCrewOnly = (ROSTER.WEEK[m_RosterWeek].flags & (1 << m_Today));
+        if(!bCrewOnly)
+        {
+          RUNSKey0.recordID = ROSTER.WEEK[m_RosterWeek].RUNSrecordIDs[m_Today];
+          rcode2 = btrieve(B_GETEQUAL, TMS_RUNS, &RUNS, &RUNSKey0, 0);
+          if(rcode2 == 0 && RUNS.runNumber == runNumber)
+          {
+            if(ROSTER.rosterNumber != previousRosterNumber && previousRosterNumber != NO_RECORD)
+            {
+              pTI[numInTripInfo].rosterNumber[0] = previousRosterNumber;
+              pTI[numInTripInfo].rosterNumber[1] = ROSTER.rosterNumber;
+            }
+            else
+            {
+              pTI[numInTripInfo].rosterNumber[0] = ROSTER.rosterNumber;
+            }
+            previousRosterNumber = ROSTER.rosterNumber;
+            break;
+          }
+        }
+        rcode2 = btrieve(B_GETNEXT, TMS_ROSTER, &ROSTER, &ROSTERKey1, 1);
+      }
+    }
+    else
+    {
+      pTI[numInTripInfo].rosterNumber[0] = previousRosterNumber;
+    }
+//
+//  Operator
+//
+    for(nI = 0; nI < 2; nI++)
+    {
+      pTI[numInTripInfo].DRIVERSrecordID[nI] = NO_RECORD;
+      if(pTI[numInTripInfo].rosterNumber[nI] == NO_RECORD)
+      {
+        continue;
+      }
+      ROSTERKey1.DIVISIONSrecordID = m_DailyOpsROSTERDivisionInEffect;
+      ROSTERKey1.rosterNumber = pTI[numInTripInfo].rosterNumber[nI];
+      rcode2 = btrieve(B_GETEQUAL, TMS_ROSTER, &ROSTER, &ROSTERKey1, 1);
+      if(rcode2 == 0)
+      {
+        pTI[numInTripInfo].DRIVERSrecordID[nI] = ROSTER.DRIVERSrecordID;
+      }
+    }
+//
+//  Relief information
+//
+//  Relief At
+//
+    pTI[numInTripInfo].reliefAtNODESrecordID = reliefAtNODESrecordID;
+    pTI[numInTripInfo].reliefAtTime = NO_TIME;
+    if(reliefAtNODESrecordID != NO_RECORD)
+    {
+//
+//  Relief time
+//
+//  Find the node on the pattern
+//
+      strcpy(tempString, "");
+      patternIndex = 0;
+      PATTERNSKey2.ROUTESrecordID = TRIPS.ROUTESrecordID;
+      PATTERNSKey2.SERVICESrecordID = TRIPS.SERVICESrecordID;
+      PATTERNSKey2.PATTERNNAMESrecordID = TRIPS.PATTERNNAMESrecordID;
+      PATTERNSKey2.directionIndex = TRIPS.directionIndex;
+      PATTERNSKey2.nodeSequence = NO_RECORD;
+      rcode2 = btrieve(B_GETGREATER, TMS_PATTERNS, &PATTERNS, &PATTERNSKey2, 2);
+      while(rcode2 == 0 &&
+            PATTERNS.ROUTESrecordID == TRIPS.ROUTESrecordID &&
+            PATTERNS.SERVICESrecordID == TRIPS.SERVICESrecordID &&
+            PATTERNS.PATTERNNAMESrecordID == TRIPS.PATTERNNAMESrecordID &&
+            PATTERNS.directionIndex == TRIPS.directionIndex)
+      {
+        if(!(PATTERNS.flags & PATTERNS_FLAG_BUSSTOP))
+        {
+          if(PATTERNS.NODESrecordID == reliefAtNODESrecordID)
+          {
+            pTI[numInTripInfo].reliefAtTime = GTResults.tripTimes[patternIndex];
+            break;
+          }
+          patternIndex++;
+        }
+        rcode2 = btrieve(B_GETNEXT, TMS_PATTERNS, &PATTERNS, &PATTERNSKey2, 2);
+      }
+    }
+//
+//  POG and POT
+//
+    pTI[numInTripInfo].POGNODESrecordID = pTRIPSChunk->POGNODESrecordID;
+    pTI[numInTripInfo].POTime = NO_TIME;
+    if(pTRIPSChunk->POGNODESrecordID != NO_RECORD)
+    {
+      pTI[numInTripInfo].POTime = BlockInfo.POTime;
+    }
+//
+//  Route
+//
+    pTI[numInTripInfo].ROUTESrecordID = TRIPS.ROUTESrecordID;
+//
+//  Pattern
+//
+    pTI[numInTripInfo].PATTERNNAMESrecordID = TRIPS.PATTERNNAMESrecordID;
+//
+//  FNode
+//
+    pTI[numInTripInfo].fromNODESrecordID = GTResults.firstNODESrecordID;
+//
+//  FTime
+//
+    pTI[numInTripInfo].fromTime = GTResults.firstNodeTime;
+//
+//  TTime
+//
+    pTI[numInTripInfo].toTime = GTResults.lastNodeTime;
+//
+//  TNode
+//
+    pTI[numInTripInfo].toNODESrecordID = GTResults.lastNODESrecordID;
+//
+//  PIG and PIT
+//
+    pTI[numInTripInfo].PIGNODESrecordID = pTRIPSChunk->PIGNODESrecordID;
+    pTI[numInTripInfo].PITime = NO_TIME;
+    if(pTRIPSChunk->PIGNODESrecordID != NO_RECORD)
+    {
+      pTI[numInTripInfo].PITime = BlockInfo.PITime;
+    }
+//
+//  Get the next record
+//
+    numInTripInfo++;
+    rcode2 = btrieve(B_GETNEXT, TMS_TRIPS, &TRIPS, &TRIPSKey2, keyNumber);
+  }
+//
+//  Adjustments
+//
+//  Cycle through the rostered and unrostered runs
+//  to pick up all the assignments for today
+//
+  DAILYOPSKey1.recordTypeFlag = DAILYOPS_FLAG_OPENWORK;
+  DAILYOPSKey1.pertainsToDate = m_DailyOpsDateYYYYMMDD;
+  DAILYOPSKey1.pertainsToTime = NO_TIME;
+  DAILYOPSKey1.recordFlags = 0;
+  rcode2 = btrieve(B_GETGREATER, TMS_DAILYOPS, &DAILYOPS, &DAILYOPSKey1, 1);
+  while(rcode2 == 0 &&
+        (DAILYOPS.recordTypeFlag & DAILYOPS_FLAG_OPENWORK) &&
+        (DAILYOPS.pertainsToDate == m_DailyOpsDateYYYYMMDD))
+  {
+    if(!ANegatedRecord(DAILYOPS.recordID, 1))
+    {
+      if(DAILYOPS.recordFlags & DAILYOPS_FLAG_OPENWORKASSIGN)
+      {
+        for(nI = 0; nI < numInTripInfo; nI++)
+        {
+          for(nJ = 0; nJ < 2; nJ++)
+          {
+            if(pTI[nI].RUNSrecordID[nJ] == NO_RECORD)
+            {
+              continue;
+            }
+            if(pTI[nI].pieceNumber[nJ] == 1)
+            {
+              RUNSrecordID = pTI[nI].RUNSrecordID[nJ];
+            }
+            else
+            {
+              RUNSKey0.recordID = pTI[nI].RUNSrecordID[nJ];
+              rcode2 = btrieve(B_GETEQUAL, TMS_RUNS, &RUNS, &RUNSKey0, 0);
+              rcode2 = btrieve(B_GETPOSITION, TMS_RUNS, &RUNS, &RUNSKey0, 0);
+              rcode2 = btrieve(B_GETDIRECT, TMS_RUNS, &RUNS, &RUNSKey1, 1);
+              runNumber = RUNS.runNumber;
+              while(RUNS.runNumber  == runNumber && 
+                    RUNS.pieceNumber != 1)
+              {
+                rcode2 = btrieve(B_GETPREVIOUS, TMS_RUNS, &RUNS, &RUNSKey1, 1);
+                RUNSrecordID = RUNS.recordID;
+              }
+            }
+            if(DAILYOPS.DOPS.OpenWork.RUNSrecordID == RUNSrecordID)
+            {
+              pTI[nI].DRIVERSrecordID[nJ] = DAILYOPS.DRIVERSrecordID;
+            }
+          }
+        }
+      }
+    }
+    rcode2 = btrieve(B_GETNEXT, TMS_DAILYOPS, &DAILYOPS, &DAILYOPSKey1, 1);
+  }
+//
+//  See who's away
+//
+  DAILYOPSKey1.recordTypeFlag = DAILYOPS_FLAG_ABSENCE;
+  DAILYOPSKey1.pertainsToDate = m_DailyOpsDateYYYYMMDD - 10000;
+  DAILYOPSKey1.pertainsToTime = NO_TIME;
+  DAILYOPSKey1.recordFlags = 0;
+  rcode2 = btrieve(B_GETGREATER, TMS_DAILYOPS, &DAILYOPS, &DAILYOPSKey1, 1);
+  while(rcode2 == 0 &&
+        (DAILYOPS.recordTypeFlag & DAILYOPS_FLAG_ABSENCE) &&
+         DAILYOPS.pertainsToDate <= m_DailyOpsDateYYYYMMDD)
+  {
+    if(m_DailyOpsDateYYYYMMDD >= DAILYOPS.pertainsToDate &&
+          m_DailyOpsDateYYYYMMDD <= DAILYOPS.DOPS.Absence.untilDate &&
+          (DAILYOPS.recordFlags & DAILYOPS_FLAG_ABSENCEREGISTER))
+    {
+      if(!ANegatedRecord(DAILYOPS.recordID, 1))
+      {
+        for(nI = 0; nI < numInTripInfo; nI++) 
+        {
+          for(nJ = 0; nJ < 2; nJ++)
+          {
+            if(pTI[nI].DRIVERSrecordID[nJ] == DAILYOPS.DRIVERSrecordID)
+            {
+              pTI[nI].DRIVERSrecordID[nJ] = NO_RECORD;
+            }
+          }
+        }
+      }
+    }
+    rcode2 = btrieve(B_GETNEXT, TMS_DAILYOPS, &DAILYOPS, &DAILYOPSKey1, 1);
+  }
+ 
+  return(numInTripInfo);
+}
+

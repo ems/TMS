@@ -12,11 +12,13 @@
 #define Square( x )		((x) * (x))
 
 /* Radius of Earth in km */
-#define RadiusOfEarth	6367.5
+#define RadiusOfEarth	6378.135
 
 /* Trig constants */
-#define PI				3.14159265358979323846
-#define	degToRad		(PI/180.0)
+#ifndef M_PI
+#define M_PI				3.14159265358979323846
+#endif
+#define	degToRad		(M_PI/180.0)
 
 /*
  * Compute the GreatCircleDistance of two points in the earth (assume earth is a sphere).
@@ -25,33 +27,34 @@
  *
  * This routine uses a method which is numerically stable.
  */
-double	GreatCircleDistance( double long1, double lat1, double long2, double lat2 )
+double	GreatCircleDistance( double lng1, double lat1, double lng2, double lat2 )
 {
 	register	double d;
 	if( m_bUseLatLong )
 	{
-		register double dlong, dlat, sin_dlatDiv2, sin_dlongDiv2, sqrtA;
+		register double dlng, dlat, x;
 
-		/* Convert to radians */
+		// Convert to radians.
+		lng1	*= degToRad;
 		lat1	*= degToRad;
-		long1	*= degToRad;
+		lng2	*= degToRad;
 		lat2	*= degToRad;
-		long2	*= degToRad;
 
-		/* Do the calculation.  Only compute intermediate results once. */
-		dlong = long2 - long1;
-		dlat = lat2 - lat1;
-		sin_dlatDiv2 = sin(dlat/2.0);
-		sin_dlongDiv2 = sin(dlong/2.0);
-		sqrtA = sqrt(sin_dlatDiv2 * sin_dlatDiv2 + cos(lat1) * cos(lat2) * sin_dlongDiv2 * sin_dlongDiv2);
-		d = RadiusOfEarth * 2.0 * asin(sqrtA < 1.0 ? sqrtA : 1.0);
+		// Compute approximate distance between two points in km. Assumes the Earth is a sphere.
+		// TODO: change to ellipsoid approximation, such as
+		// http://www.codeguru.com/Cpp/Cpp/algorithms/article.php/c5115/
+		dlat = sin(0.5 * (lat2 - lat1));
+		dlng = sin(0.5 * (lng2 - lng1));
+		x = dlat * dlat + dlng * dlng * cos(lat1) * cos(lat2);
+		d = RadiusOfEarth * (2.0 * atan2(sqrt(x), sqrt(x < 1.0 ? 1.0 - x : 0.0)));
 	}
 	else
 	{
 		// Assume coords are in UTM, in meters.
-		d = sqrt( Square(long2 - long1) + Square(lat2 - lat1) ) / 1000.0;
+		d = sqrt( Square(lng2 - lng1) + Square(lat2 - lat1) ) / 1000.0;
 	}
-	return distanceMeasure == PREFERENCES_KILOMETERS ? d : kmToMiles(d);
+  
+ 	return distanceMeasure == 1 ? d : kmToMiles(d);
 }
 
 double	RectilinearGreatCircleDistance( double long1, double lat1, double long2, double lat2 )

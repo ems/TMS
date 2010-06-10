@@ -1065,6 +1065,7 @@ BOOL FAR TMSRPT66(TMSRPTPassedDataDef *pPassedData)
     goto done;
   }
   StatusBarText(outputFileName);
+  m_numConnectionAlerts = 0;
 //
 //  Go through the services
 //
@@ -1133,6 +1134,14 @@ BOOL FAR TMSRPT66(TMSRPTPassedDataDef *pPassedData)
 //  There has to be one
 //
 //          if(bActive)
+//
+//  If there isn't one, gen it on the base pattern at noon (for lack of a better time)
+//
+          if(!bActive)
+          {
+            GenerateTrip(ROUTES.recordID, SERVICES.recordID,
+                  (long)nI, basePatternRecordID, 43200L, GENERATETRIP_FLAG_DISPLAYERRORS, &GTResults);
+          }
           {
 //
 //  Pattern_Record_Id
@@ -1198,6 +1207,7 @@ BOOL FAR TMSRPT66(TMSRPTPassedDataDef *pPassedData)
             PATTERNSKey2.nodeSequence = NO_RECORD;
             rcode2 = btrieve(B_GETGREATER, TMS_PATTERNS, &PATTERNS, &PATTERNSKey2, 2);
             tripIndex = 0;
+            distanceToHere = 0;
             while(rcode2 == 0 &&
                   PATTERNS.ROUTESrecordID == ROUTES.recordID &&
                   PATTERNS.SERVICESrecordID == SERVICES.recordID &&
@@ -1224,7 +1234,7 @@ BOOL FAR TMSRPT66(TMSRPTPassedDataDef *pPassedData)
               else
               {
                 timeAtStop = GTResults.tripTimes[tripIndex] - GTResults.firstNodeTime;
-                distanceToHere = 0.0;
+//                distanceToHere = 0.0;
                 tripIndex++;
               }
 //
@@ -1249,9 +1259,16 @@ BOOL FAR TMSRPT66(TMSRPTPassedDataDef *pPassedData)
               sprintf(tempString, "%ld,", PATTERNS.NODESrecordID);
               strcat(outputString, tempString);
 //
+//  Fix for negative times for patterns not used but needed to be unloaded
+//
+              if(timeAtStop < 0)
+              {
+                timeAtStop = ++previousTime_Offset;
+              }
+//
 //  Time_Offset (Time at the stop, in seconds)
 //
-              if(timeAtStop == previousTime_Offset)
+              else if(timeAtStop == previousTime_Offset)
               {
                 timeAtStop++;
                 sprintf(tempString, "%ld has identical time offset to previous node on %ld.  Time adjusted by 1 second to %ld.\r\n",
@@ -1263,7 +1280,8 @@ BOOL FAR TMSRPT66(TMSRPTPassedDataDef *pPassedData)
 //
 //  Distance_Offset (Distance from the beginning of the trip to this stop, in feet)
 //
-              distanceInFeet = (long)((tripDistances[tripIndex - 1] + distanceToHere) * 5280);
+//              distanceInFeet = (long)((tripDistances[tripIndex - 1] + distanceToHere) * 5280);
+              distanceInFeet = (long)(distanceToHere * 5280);
               if(distanceInFeet == previousDistance_Offset)
               {
                 distanceInFeet++;

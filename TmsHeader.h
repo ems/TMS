@@ -741,10 +741,16 @@ typedef struct RunsStruct
   long startNODESrecordID;
   char szStartNodeName[NODES_ABBRNAME_LENGTH + 1];
   long startTime;
+  long reportAtNODESrecordID;
+  char szReportAtNodeName[NODES_ABBRNAME_LENGTH + 1];
+  long reportAtTime;
   long endTRIPSrecordID;
   long endNODESrecordID;
   char szEndNodeName[NODES_ABBRNAME_LENGTH + 1];
   long endTime;
+  long turninAtNODESrecordID;
+  char szTurninAtNodeName[NODES_ABBRNAME_LENGTH + 1];
+  long turninAtTime;
   long payTime;
   long flags;
 } RunsDef;

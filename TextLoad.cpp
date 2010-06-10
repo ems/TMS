@@ -125,43 +125,45 @@ BOOL CTMSApp::TextLoad()
     TextAbsenceReasons.MoveFirst();
     while(!TextAbsenceReasons.IsEOF())
     {
+      if(TextAbsenceReasons.m_ReasonText != "*Unused*")
+      {
 //
 //  Rule pointer
 //
-      m_AbsenceReasons[m_numAbsenceReasons].ruleNumber = TextAbsenceReasons.m_ReasonPointer;
+        m_AbsenceReasons[m_numAbsenceReasons].ruleNumber = TextAbsenceReasons.m_ReasonPointer;
 /*
 //
 //  Does this count toward unpaid time?
 //
-      m_AbsenceReasons[m_numAbsenceReasons].bCountsTowardUnpaidTime =
-            (TextAbsenceReasons.m_ReasonCountsTowardUnpaidTime == "Y");
+        m_AbsenceReasons[m_numAbsenceReasons].bCountsTowardUnpaidTime =
+              (TextAbsenceReasons.m_ReasonCountsTowardUnpaidTime == "Y");
 */
 //
 //  What gets paid on an absence?
 //
-      if(TextAbsenceReasons.m_ReasonCountsTowardUnpaidTime == "Actual")
-      {
-        m_AbsenceReasons[m_numAbsenceReasons].paidOnAbsence = NO_TIME;
-      }
-      else
-      {
-        strcpy(tempString, TextAbsenceReasons.m_ReasonCountsTowardUnpaidTime);
-        m_AbsenceReasons[m_numAbsenceReasons].paidOnAbsence = thhmm(tempString);
-      }
-
+        if(TextAbsenceReasons.m_ReasonCountsTowardUnpaidTime == "Actual")
+        {
+          m_AbsenceReasons[m_numAbsenceReasons].paidOnAbsence = NO_TIME;
+        }
+        else
+        {
+          strcpy(tempString, TextAbsenceReasons.m_ReasonCountsTowardUnpaidTime);
+          m_AbsenceReasons[m_numAbsenceReasons].paidOnAbsence = thhmm(tempString);
+        }
 //
 //  Rule text
 //
-      strcpy(m_AbsenceReasons[m_numAbsenceReasons].szText, TextAbsenceReasons.m_ReasonText);
+        strcpy(m_AbsenceReasons[m_numAbsenceReasons].szText, TextAbsenceReasons.m_ReasonText);
 //
 //  Rule payroll code
 //
-      strcpy(m_AbsenceReasons[m_numAbsenceReasons].szPayrollCode, TextAbsenceReasons.m_ReasonPayrollCode);
+        strcpy(m_AbsenceReasons[m_numAbsenceReasons].szPayrollCode, TextAbsenceReasons.m_ReasonPayrollCode);
+        m_numAbsenceReasons++;
+      }
 //
 //  Get the next record
 //
       TextAbsenceReasons.MoveNext();
-      m_numAbsenceReasons++;
     }
   }
   TextAbsenceReasons.Close( );

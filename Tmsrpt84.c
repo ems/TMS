@@ -1202,6 +1202,22 @@ BOOL FAR TMSRPT84(TMSRPTPassedDataDef *pPassedData)
             RUNS.DIVISIONSrecordID == DIVISIONS.recordID &&
             RUNS.SERVICESrecordID == SERVICES.recordID)
       {
+        TRIPSKey0.recordID = RUNS.start.TRIPSrecordID;
+        rcode2 = btrieve(B_GETEQUAL, TMS_TRIPS, &TRIPS, &TRIPSKey0, 0);
+        if(rcode2 == 0)
+        {
+          NODESKey0.recordID = RUNS.start.NODESrecordID;
+          rcode2 = btrieve(B_GETEQUAL, TMS_NODES, &NODES, &NODESKey0, 0);
+          if(rcode2 == 0)
+          {
+            TRIPSKey0.recordID = RUNS.end.TRIPSrecordID;
+            rcode2 = btrieve(B_GETEQUAL, TMS_TRIPS, &TRIPS, &TRIPSKey0, 0);
+            if(rcode2 == 0)
+            {
+              NODESKey0.recordID = RUNS.end.NODESrecordID;
+              rcode2 = btrieve(B_GETEQUAL, TMS_NODES, &NODES, &NODESKey0, 0);
+              if(rcode2 == 0)
+              {
 //
 //  ServiceCode (SERVICES.recordID)
 //  RunCode (RUNS.runNumber)
@@ -1211,11 +1227,15 @@ BOOL FAR TMSRPT84(TMSRPTPassedDataDef *pPassedData)
 //  EndTrip (RUNS.end.TRIPSrecordID)
 //  EndStop (RUNS.end.NODESrecordID)
 //
-        sprintf(outputString, "%ld,%ld,%ld,%ld,%ld,%ld,%ld\r\n",
-              SERVICES.recordID, RUNS.runNumber, RUNS.pieceNumber,
-              RUNS.start.TRIPSrecordID, RUNS.start.NODESrecordID,
-              RUNS.end.TRIPSrecordID, RUNS.end.NODESrecordID);
-        _lwrite(hfOutputFile, outputString, strlen(outputString));
+                sprintf(outputString, "%ld,%ld,%ld,%ld,%ld,%ld,%ld\r\n",
+                      SERVICES.recordID, RUNS.runNumber, RUNS.pieceNumber,
+                      RUNS.start.TRIPSrecordID, RUNS.start.NODESrecordID,
+                      RUNS.end.TRIPSrecordID, RUNS.end.NODESrecordID);
+                _lwrite(hfOutputFile, outputString, strlen(outputString));
+              }
+            }
+          }
+        }
         rcode2 = btrieve(B_GETNEXT, TMS_RUNS, &RUNS, &RUNSKey1, 1);
       }
 //

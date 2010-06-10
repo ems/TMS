@@ -259,9 +259,27 @@ BOOL CDailyOpsRS::OnInitDialog()
       serviceIndex = 0;
     }
 //
+//  Get some pertinent run information
+//
+    PROPOSEDRUNDef PROPOSEDRUN;
+    COSTDef        COST;
+
+    GetRunElements(NULL, &RUNS, &PROPOSEDRUN, &COST, TRUE);
+    if(m_bCrewOnly)
+    {
+      CREWONLY.recordID = m_pPassedData->RUNSrecordID;
+      rcode2 = btrieve(B_GETEQUAL, TMS_CREWONLY, &CREWONLY, &CREWONLYKey0, 0);
+      runNumber = CREWONLY.runNumber;
+    }
+    else
+    {
+      RUNSKey0.recordID = m_pPassedData->RUNSrecordID;
+      rcode2 = btrieve(B_GETEQUAL, TMS_RUNS, &RUNS, &RUNSKey0, 0);
+      runNumber = RUNS.runNumber;
+    }
+//
 //  Cycle through the run
 //
-    pieceNumber = 0;
     runNumber = RUNS.runNumber;
     serviceRecordID = RUNS.SERVICESrecordID;
     runtype = RUNS.cutAsRuntype;
@@ -271,6 +289,27 @@ BOOL CDailyOpsRS::OnInitDialog()
           runNumber == RUNS.runNumber &&
           serviceRecordID == RUNS.SERVICESrecordID)
     {
+      pieceNumber = RUNS.pieceNumber - 1;
+//
+//  Get the report at location and time
+//
+      if(COST.TRAVEL[pieceNumber].startNODESrecordID == NO_RECORD)
+      {
+        m_RP[m_numRP].NODESrecordID = PROPOSEDRUN.piece[pieceNumber].fromNODESrecordID;
+      }
+      else
+      {
+        m_RP[m_numRP].NODESrecordID = COST.TRAVEL[pieceNumber].startNODESrecordID;
+      }
+      m_RP[m_numRP].time = PROPOSEDRUN.piece[pieceNumber].fromTime -
+              COST.PIECECOST[pieceNumber].reportTime - COST.TRAVEL[pieceNumber].startTravelTime;
+      if(PROPOSEDRUN.piece[pieceNumber].prior.startTime != NO_TIME)
+      {
+        m_RP[m_numRP].time -= PROPOSEDRUN.piece[pieceNumber].prior.startTime;
+      }
+      m_RP[m_numRP].flags = RP_FLAGS_STARTOFPIECE;
+      m_RP[m_numRP].TRIPSrecordID = NO_RECORD;
+      m_numRP++;
 //
 //  Generate the start trip
 //
@@ -283,7 +322,7 @@ BOOL CDailyOpsRS::OnInitDialog()
 //  Is the node a pullout?
 //
       bFound = FALSE;
-      bStartOfPiece = TRUE;
+//      bStartOfPiece = TRUE;
       if(TRIPS.standard.POGNODESrecordID == RUNS.start.NODESrecordID)
       {
         GCTData.fromPATTERNNAMESrecordID = TRIPS.PATTERNNAMESrecordID;
@@ -298,11 +337,12 @@ BOOL CDailyOpsRS::OnInitDialog()
         dhdTime = GetConnectionTime(GCT_FLAG_DEADHEADTIME, &GCTData, &distance);
         m_RP[m_numRP].NODESrecordID = RUNS.start.NODESrecordID;
         m_RP[m_numRP].time = GTResults.firstNodeTime - (dhdTime == NO_TIME ? 0 : dhdTime);
-        m_RP[m_numRP].flags = RP_FLAGS_STARTOFPIECE;
+//        m_RP[m_numRP].flags = RP_FLAGS_STARTOFPIECE;
+        m_RP[m_numRP].flags = 0;
         m_RP[m_numRP].TRIPSrecordID = TRIPS.recordID;
         m_numRP++;
         bFound = TRUE;
-        bStartOfPiece = FALSE;
+//        bStartOfPiece = FALSE;
       }
 //
 //  Find any relief points on the trip
@@ -334,15 +374,15 @@ BOOL CDailyOpsRS::OnInitDialog()
             {
               m_RP[m_numRP].NODESrecordID = PATTERNS.NODESrecordID;
               m_RP[m_numRP].time = GTResults.tripTimes[counter];
-              if(bStartOfPiece)
-              {
-                m_RP[m_numRP].flags = RP_FLAGS_STARTOFPIECE;
-                bStartOfPiece = FALSE;
-              }
-              else
-              {
+//              if(bStartOfPiece)
+//              {
+//                m_RP[m_numRP].flags = RP_FLAGS_STARTOFPIECE;
+//                bStartOfPiece = FALSE;
+//              }
+//              else
+//              {
                 m_RP[m_numRP].flags = 0;
-              }
+//              }
               m_RP[m_numRP].TRIPSrecordID = TRIPS.recordID;
               m_numRP++;
             }
@@ -369,7 +409,8 @@ BOOL CDailyOpsRS::OnInitDialog()
         dhdTime = GetConnectionTime(GCT_FLAG_DEADHEADTIME, &GCTData, &distance);
         m_RP[m_numRP].NODESrecordID = RUNS.end.NODESrecordID;
         m_RP[m_numRP].time = GTResults.lastNodeTime + (dhdTime == NO_TIME ? 0 : dhdTime);
-        m_RP[m_numRP].flags = RP_FLAGS_ENDOFPIECE;
+//        m_RP[m_numRP].flags = RP_FLAGS_ENDOFPIECE;
+        m_RP[m_numRP].flags = 0;
         m_RP[m_numRP].TRIPSrecordID = TRIPS.recordID;
         m_numRP++;
         bFound = TRUE;
@@ -424,7 +465,8 @@ BOOL CDailyOpsRS::OnInitDialog()
               {
                 m_RP[m_numRP].NODESrecordID = PATTERNS.NODESrecordID;
                 m_RP[m_numRP].time = GTResults.tripTimes[counter];
-                m_RP[m_numRP].flags = RP_FLAGS_ENDOFPIECE;
+//                m_RP[m_numRP].flags = RP_FLAGS_ENDOFPIECE;
+                m_RP[m_numRP].flags = 0;
                 bEndOfPiece = TRUE;
                 m_RP[m_numRP].TRIPSrecordID = TRIPS.recordID;
                 m_numRP++;
@@ -464,7 +506,8 @@ BOOL CDailyOpsRS::OnInitDialog()
             dhdTime = GetConnectionTime(GCT_FLAG_DEADHEADTIME, &GCTData, &distance);
             m_RP[m_numRP].NODESrecordID = RUNS.end.NODESrecordID;
             m_RP[m_numRP].time = GTResults.lastNodeTime + (dhdTime == NO_TIME ? 0 : dhdTime);
-            m_RP[m_numRP].flags = RP_FLAGS_ENDOFPIECE;
+//            m_RP[m_numRP].flags = RP_FLAGS_ENDOFPIECE;
+            m_RP[m_numRP].flags = 0;
             bEndOfPiece = TRUE;
             m_RP[m_numRP].TRIPSrecordID = TRIPS.recordID;
             m_numRP++;
@@ -474,6 +517,33 @@ BOOL CDailyOpsRS::OnInitDialog()
 //
           if(bEndOfPiece)
           {
+//
+//  Get the turnin location and time if they differ from where we are
+//
+            if(COST.TRAVEL[pieceNumber].endNODESrecordID == NO_RECORD)
+            {
+              m_RP[m_numRP - 1].flags = RP_FLAGS_ENDOFPIECE;
+            }
+            else
+            {
+              if(COST.TRAVEL[pieceNumber].endNODESrecordID == NO_RECORD)
+              {
+                m_RP[m_numRP].NODESrecordID = PROPOSEDRUN.piece[pieceNumber].toNODESrecordID;
+              }
+              else
+              {
+                m_RP[m_numRP].NODESrecordID = COST.TRAVEL[pieceNumber].endNODESrecordID;
+              }
+              m_RP[m_numRP].time = PROPOSEDRUN.piece[pieceNumber].toTime +
+                    COST.PIECECOST[pieceNumber].turninTime + COST.TRAVEL[pieceNumber].endTravelTime;
+              if(PROPOSEDRUN.piece[pieceNumber].after.endTime != NO_TIME)
+              {
+                m_RP[m_numRP].time += PROPOSEDRUN.piece[pieceNumber].after.endTime;
+              }
+              m_RP[m_numRP].flags = RP_FLAGS_ENDOFPIECE;
+              m_RP[m_numRP].TRIPSrecordID = NO_RECORD;
+              m_numRP++;
+            }
             break;
           }
 //

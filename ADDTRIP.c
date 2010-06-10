@@ -827,7 +827,8 @@ BOOL CALLBACK ADDTRIPMsgProc(HWND hWndDlg, UINT Message, WPARAM wParam, LPARAM l
                  newRecID = TRIPS.recordID;
                }
              }
-             sprintf(tempString, "headway: %d, number of trips: %d", headway, numTrips); 
+             sprintf(tempString, "headway: %d, number of trips: %d - last was %s",
+                   headway, numTrips, Tchar(TRIPS.timeAtMLP)); 
            }
            else
            {
@@ -850,7 +851,8 @@ BOOL CALLBACK ADDTRIPMsgProc(HWND hWndDlg, UINT Message, WPARAM wParam, LPARAM l
                }
                timeAtMLP += (headway * 60);
              }
-             sprintf(tempString, "headway: %d, until: %s", headway, Tchar(untilTime));
+             sprintf(szarString, "headway: %d, until: %s - last was", headway, Tchar(untilTime));
+             sprintf(tempString, "%s %s", szarString, Tchar(TRIPS.timeAtMLP));
            }
            strcat(szLastTrip, tempString);
            MessageBeep(MB_ICONINFORMATION);

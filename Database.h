@@ -76,7 +76,7 @@ typedef DISPLAYINFO *PDISPLAYINFO;
 //
 
 #define RECORDIDS_KEPT 50
-#define MAXCONNECTIONSKEPT 10000
+#define MAXCONNECTIONSKEPT 20000
 typedef struct CONNStruct
 {
   long currentFromNODESrecordID;
@@ -142,7 +142,7 @@ typedef struct PICKEDBLOCKSStruct
 //  Runtimes
 //
 
-#define MAXCONNECTIONS 10000
+#define MAXCONNECTIONS 20000
 EXTERN CONNECTIONSDef *m_pRUNTIMES;
 EXTERN BOOL  m_bEstablishRUNTIMES;
 EXTERN int   m_numRUNTIMES;
@@ -236,7 +236,7 @@ EXTERN long m_DivisionNumber;
 #define TMSDATA_STARTOFPIECETRAVEL   51
 #define TMSDATA_ENDOFPIECETRAVEL     52
 #define TMSDATA_REPORTATTIME         53
-#define TMSDATA_RPT                  54
+#define TMSDATA_REPORTATLOCATION     54
 #define TMSDATA_BOPEXTRABOARDSTART   55
 #define TMSDATA_BOPEXTRABOARDEND     56
 #define TMSDATA_EOPEXTRABOARDSTART   57
@@ -314,7 +314,7 @@ EXTERN long m_DivisionNumber;
 #define TMSDATA_STARTOFPIECETRAVEL_TEXT   "Travel time (Start of piece)"
 #define TMSDATA_ENDOFPIECETRAVEL_TEXT     "Travel time (End of piece)"
 #define TMSDATA_REPORTATTIME_TEXT         "Report at time"
-#define TMSDATA_RPT_TEXT                  "Report + Platform + Travel"
+#define TMSDATA_REPORTATLOCATION_TEXT     "Report at location"
 #define TMSDATA_BOPEXTRABOARDSTART_TEXT   "Extraboard Start Time - Start of Piece"
 #define TMSDATA_BOPEXTRABOARDEND_TEXT     "Extraboard End Time - Start of Piece"
 #define TMSDATA_EOPEXTRABOARDSTART_TEXT   "Extraboard Start Time - End of Piece"

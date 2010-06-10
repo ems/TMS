@@ -4,13 +4,16 @@
 //  All rights reserved.
 //
 //
-//  TMS Unload to the Orbital AVL System
+//  TMS Unload to the ACS AVL System
 //
 
 #include "TMSHeader.h"
 #include "cistms.h"
 #include "limits.h"
 #include <math.h>
+
+#define INACTIVE "INACTIVE"
+#define INACTIVE_LENGTH 8
 
 int  distanceMeasureSave;
 
@@ -141,6 +144,8 @@ BOOL FAR TMSRPT61(TMSRPTPassedDataDef *pPassedData)
   BOOL  bFirstTimepoint;
   BOOL  bFromIsAStop;
   BOOL  bToIsAStop;
+  BOOL  bActive;
+  BOOL  bRoundUp;
   long  startTime;
   long  endTime;
   long  startPlace;
@@ -179,6 +184,7 @@ BOOL FAR TMSRPT61(TMSRPTPassedDataDef *pPassedData)
   long  NODESrecordID;
   long  stopNumber;
   long  stopNODESrecordID;
+  long  inactiveRecordID;
   char  outputString[1024];
   char  outputStringSave[1024];
   char  dummy[256];
@@ -389,7 +395,7 @@ BOOL FAR TMSRPT61(TMSRPTPassedDataDef *pPassedData)
     {
       break;
     }
-    if(CONNECTIONS.flags & CONNECTIONS_FLAG_EQUIVALENT)
+    if(CONNECTIONS.flags & CONNECTIONS_FLAG_AVLEQUIVALENT)
     {
       NEQ[numNEQ].primaryNODESrecordID = CONNECTIONS.fromNODESrecordID;
       NEQ[numNEQ].secondaryNODESrecordID = CONNECTIONS.toNODESrecordID;
@@ -407,10 +413,21 @@ BOOL FAR TMSRPT61(TMSRPTPassedDataDef *pPassedData)
     bGotError = TRUE;
   }
 //
+//  Save the "INACTIVE" comment recordID in case we're not downloading some stuff
+//
+  strncpy(COMMENTSKey1.code, INACTIVE, INACTIVE_LENGTH);
+  pad(COMMENTSKey1.code, INACTIVE_LENGTH);
+  recordLength[TMS_COMMENTS] = COMMENTS_TOTAL_LENGTH;
+  rcode2 = btrieve(B_GETEQUAL, TMS_COMMENTS, pCommentText, &COMMENTSKey1, 1);
+  recordLength[TMS_COMMENTS] = COMMENTS_FIXED_LENGTH;
+  memcpy(&COMMENTS, pCommentText, COMMENTS_FIXED_LENGTH);
+  inactiveRecordID = (rcode2 == 0 ? COMMENTS.recordID : 0);
+//
 //  Figure out the "Booking name" - it's used as part of the output file names
 //  We'll just use the first six characters of the short database description
 //
-  strncpy(szarString, szShortDatabaseDescription, SZBOOKINGNAME_LENGTH);
+//  strncpy(szarString, szShortDatabaseDescription, SZBOOKINGNAME_LENGTH);
+  strcpy(szarString, szShortDatabaseDescription);
   trim(szarString, SZBOOKINGNAME_LENGTH);
   strcpy(szBookingName, szarString);
 //
@@ -783,6 +800,13 @@ BOOL FAR TMSRPT61(TMSRPTPassedDataDef *pPassedData)
         continue;
       }
 //
+//  Don't unload this route if it's been marked as INACTIVE
+//
+      if(ROUTES.COMMENTSrecordID == inactiveRecordID)
+      {
+        break;
+      }  
+//
 //  There must be trips on this route to record route values
 //
       TRIPSKey1.ROUTESrecordID = ROUTES.recordID;
@@ -816,18 +840,28 @@ BOOL FAR TMSRPT61(TMSRPTPassedDataDef *pPassedData)
 //  New: Route ID - Make it as close to "Route Short Name" as possible
 //       This takes alphas into account and outputs them 62A to 621, 62B to 622, and so on.
 //
-      strncpy(tempString, ROUTES.number, ROUTES_NUMBER_LENGTH);
-      trim(tempString, ROUTES_NUMBER_LENGTH);
-      tempString[RTEFILE_ROUTENUMBER_LENGTH] = '\0';
-      ptr = tempString;
-      while(*ptr)
+//  New: If there's an alternate route number (numeric only) use that instead
+//
+      if(ROUTES.alternate > 0)
       {
-        if(isalpha(*ptr))
-        {
-          *ptr -= 16;
-        }
-        ptr++;
+        sprintf(tempString, "%ld", ROUTES.alternate);
+        pad(tempString, RTEFILE_ROUTENUMBER_LENGTH);
       }
+      else
+      {
+        strncpy(tempString, ROUTES.number, ROUTES_NUMBER_LENGTH);
+        trim(tempString, ROUTES_NUMBER_LENGTH);
+      }
+      tempString[RTEFILE_ROUTENUMBER_LENGTH] = '\0';
+//      ptr = tempString;
+//      while(*ptr)
+//      {
+//        if(isalpha(*ptr))
+//        {
+//          *ptr -= 16;
+//        }
+//        ptr++;
+//      }
       strcat(outputString, tempString);
       strcat(outputString, ",");
 //
@@ -1100,6 +1134,13 @@ BOOL FAR TMSRPT61(TMSRPTPassedDataDef *pPassedData)
         }
       }
 //
+//  Don't unload this route if it's been marked as INACTIVE
+//
+      if(ROUTES.COMMENTSrecordID == inactiveRecordID)
+      {
+        continue;
+      }  
+//
 //  There have to be blocks on this route and service
 //
       TRIPSKey2.assignedToNODESrecordID = NO_RECORD;
@@ -1213,11 +1254,15 @@ BOOL FAR TMSRPT61(TMSRPTPassedDataDef *pPassedData)
             GCTData.fromSERVICESrecordID = TRIPS.SERVICESrecordID;
             GCTData.toROUTESrecordID = TRIPS.ROUTESrecordID;
             GCTData.toSERVICESrecordID = TRIPS.SERVICESrecordID;
-            GCTData.fromNODESrecordID = previousNode;
-            GCTData.toNODESrecordID = PATTERNS.NODESrecordID;
+            GCTData.fromNODESrecordID = startPlace;
+            GCTData.toNODESrecordID = endPlace;
             GCTData.timeOfDay = GTResults.firstNodeTime;
             deadheadTime = GetConnectionTime(GCT_FLAG_DEADHEADTIME, &GCTData, &distance);
             distance = (float)fabs((double)distance);
+            if(deadheadTime == NO_TIME)
+            {
+              deadheadTime = 0;
+            }
             endTime = GTResults.lastNodeTime + (deadheadTime == NO_TIME ? 0 : deadheadTime);
           }
           else if(tripType == 2 || tripType == 3)  // Time in garage from sign on to pullout (AKA Prep Time) and Pullout
@@ -1366,18 +1411,28 @@ BOOL FAR TMSRPT61(TMSRPTPassedDataDef *pPassedData)
 //  New: Route ID - Make it as close to "Route Short Name" as possible
 //       This takes alphas into account and outputs them 62A to 621, 62B to 622, and so on.
 //
-          strncpy(szRouteID, ROUTES.number, ROUTES_NUMBER_LENGTH);
-          trim(szRouteID, ROUTES_NUMBER_LENGTH);
-          szRouteID[RTEFILE_ROUTENUMBER_LENGTH] = '\0';
-          ptr = szRouteID;
-          while(*ptr)
+//  New: If there's an alternate route number (numeric only) use that instead
+//
+          if(ROUTES.alternate > 0)
           {
-            if(isalpha(*ptr))
-            {
-              *ptr -= 16;
-            }
-            ptr++;
+            sprintf(szRouteID, "%ld", ROUTES.alternate);
+            pad(szRouteID, RTEFILE_ROUTENUMBER_LENGTH);
           }
+          else
+          {
+            strncpy(szRouteID, ROUTES.number, ROUTES_NUMBER_LENGTH);
+            trim(szRouteID, ROUTES_NUMBER_LENGTH);
+          }
+          szRouteID[RTEFILE_ROUTENUMBER_LENGTH] = '\0';
+//          ptr = szRouteID;
+//          while(*ptr)
+//          {
+//            if(isalpha(*ptr))
+//            {
+//              *ptr -= 16;
+//            }
+//            ptr++;
+//          }
           strcat(outputString, szRouteID);
           strcat(outputString, ",");
           if(bReposition)
@@ -1443,11 +1498,19 @@ BOOL FAR TMSRPT61(TMSRPTPassedDataDef *pPassedData)
 //
 //  Start time
 //
+          if(startTime % 60 != 0)
+          {
+            startTime += 30;
+          }
           sprintf(tempString, "%ld,", startTime);
           strcat(outputString, tempString);
 //
 //  End time
 //
+          if(endTime % 60 != 0)
+          {
+            endTime += 30;
+          }
           sprintf(tempString, "%ld,", endTime);
           strcat(outputString, tempString);
 //
@@ -1518,10 +1581,6 @@ BOOL FAR TMSRPT61(TMSRPTPassedDataDef *pPassedData)
 //
 //  Passing times (tripType 0)
 //
-          if(TRIPS.standard.blockNumber == 6801)
-          {
-            nL = 0;
-          }
           if(tripType == 0)
           {
 //
@@ -1531,6 +1590,7 @@ BOOL FAR TMSRPT61(TMSRPTPassedDataDef *pPassedData)
             outputStringSave[1] = '0';
             nL = 0;
             nM = 0;
+            bRoundUp = TRUE;
             PATTERNSKey2.ROUTESrecordID = TRIPS.ROUTESrecordID;
             PATTERNSKey2.SERVICESrecordID = TRIPS.SERVICESrecordID;
             PATTERNSKey2.PATTERNNAMESrecordID = TRIPS.PATTERNNAMESrecordID;
@@ -1672,7 +1732,14 @@ BOOL FAR TMSRPT61(TMSRPTPassedDataDef *pPassedData)
 //
 //  Passing time (time at the node)
 //
-                    sprintf(tempString, "%ld,", GTResults.tripTimes[nM++]);
+                    if(GTResults.tripTimes[nM] % 60 != 0)
+                    {
+//                      GTResults.tripTimes[nM] += (bRoundUp ? 30 : -30);
+//                      bRoundUp = !bRoundUp;
+                      GTResults.tripTimes[nM] += 30;
+                    }
+                    sprintf(tempString, "%ld,", GTResults.tripTimes[nM]);
+                    nM++;
                     strcat(outputString, tempString);
 //
 //  Transfer point only (always 0)
@@ -1704,11 +1771,11 @@ BOOL FAR TMSRPT61(TMSRPTPassedDataDef *pPassedData)
         rcode2 = btrieve(B_GETNEXT, TMS_TRIPS, &TRIPS, &TRIPSKey2, 2);
       }  // while going through the trips
     }  // nJ - routes
-  }  // nI - services
 //
 //  Close the files
 //
-  _lclose(hfOutputFile);
+    _lclose(hfOutputFile);
+  }  // nI - services
 //
 //  ================================
 //  Comment File - com<bbbbbbb>.dat
@@ -1851,6 +1918,13 @@ BOOL FAR TMSRPT61(TMSRPTPassedDataDef *pPassedData)
         }
       }
 //
+//  Don't unload this route if it's been marked as INACTIVE
+//
+      if(ROUTES.COMMENTSrecordID == inactiveRecordID)
+      {
+        continue;
+      }  
+//
 //  There have to be blocks on this route and service
 //
       TRIPSKey2.assignedToNODESrecordID = NO_RECORD;
@@ -1906,18 +1980,29 @@ BOOL FAR TMSRPT61(TMSRPTPassedDataDef *pPassedData)
           ROUTESrecordID = ROUTES.recordID;
           ROUTESKey0.recordID = TRIPS.ROUTESrecordID;
           btrieve(B_GETEQUAL, TMS_ROUTES, &ROUTES, &ROUTESKey0, 0);
-          strncpy(tempString, ROUTES.number, ROUTES_NUMBER_LENGTH);
-          trim(tempString, ROUTES_NUMBER_LENGTH);
-          tempString[RTEFILE_ROUTENUMBER_LENGTH] = '\0';
-          ptr = tempString;
-          while(*ptr)
+//
+//  New: If there's an alternate route number (numeric only) use that instead
+//
+          if(ROUTES.alternate > 0)
           {
-            if(isalpha(*ptr))
-            {
-              *ptr -= 16;
-            }
-            ptr++;
+            sprintf(tempString, "%ld", ROUTES.alternate);
+            pad(tempString, RTEFILE_ROUTENUMBER_LENGTH);
           }
+          else
+          {
+            strncpy(tempString, ROUTES.number, ROUTES_NUMBER_LENGTH);
+            trim(tempString, ROUTES_NUMBER_LENGTH);
+          }
+          tempString[RTEFILE_ROUTENUMBER_LENGTH] = '\0';
+//          ptr = tempString;
+//          while(*ptr)
+//          {
+//            if(isalpha(*ptr))
+//            {
+//              *ptr -= 16;
+//            }
+//            ptr++;
+//          }
           strcat(outputString, tempString);
           strcat(outputString, ",");
 //
@@ -1956,6 +2041,10 @@ BOOL FAR TMSRPT61(TMSRPTPassedDataDef *pPassedData)
           distance = (float)fabs((double)distance);
           POTime = deadheadTime == NO_TIME ?
                 GTResults.firstNodeTime : GTResults.firstNodeTime - deadheadTime;
+          if(POTime % 60 != 0)
+          {
+            POTime += 30;
+          }
           sprintf(tempString, "%ld,", POTime);
           strcat(outputString, tempString);
           startNODESrecordID = TRIPS.standard.POGNODESrecordID;
@@ -2001,6 +2090,10 @@ BOOL FAR TMSRPT61(TMSRPTPassedDataDef *pPassedData)
             distance = (float)fabs((double)distance);
             PITime = deadheadTime == NO_TIME ?
                   GTResults.lastNodeTime : GTResults.lastNodeTime + deadheadTime;
+            if(PITime % 60 != 0)
+            {
+              PITime += 30;
+            }
             sprintf(tempString, "%ld,", PITime);
             strcat(outputString, tempString);
 //
@@ -2067,11 +2160,11 @@ BOOL FAR TMSRPT61(TMSRPTPassedDataDef *pPassedData)
         }  // POG != NO_RECORD
       }  // while
     }  // nJ
-  }  // nI
 //
 //  Close the file
 //
-  _lclose(hfOutputFile);
+    _lclose(hfOutputFile);
+  }  // nI
 //
 //  ===============================
 //  Run File - run<ss><bbbbbbb>.dat
@@ -2107,7 +2200,10 @@ BOOL FAR TMSRPT61(TMSRPTPassedDataDef *pPassedData)
 //
 //  Get the garage name.  Orbital uses the terms division and garage interchangably - we don't
 //
-    strcpy(szDivisionName, "GAR");
+//  Removed 09-Mar-10.  Rev "M" of the interface spec calls for the division_garages.dat
+//                      file, which is now unloaded at the end.
+//
+//    strcpy(szDivisionName, "GAR");
 //
 //  Cycle through the divisions
 //
@@ -2131,6 +2227,11 @@ BOOL FAR TMSRPT61(TMSRPTPassedDataDef *pPassedData)
           break;
         }
       }
+//
+//  Get the division name
+//
+      strncpy(szDivisionName, DIVISIONS.name, DIVISIONS_NAME_LENGTH);
+      trim(szDivisionName, DIVISIONS_NAME_LENGTH);
 //
 //  Get the runs
 //
@@ -2218,7 +2319,7 @@ BOOL FAR TMSRPT61(TMSRPTPassedDataDef *pPassedData)
 //
 //  Piece number
 //
-          sprintf(tempString, "%d,", nK);
+          sprintf(tempString, "%d,", nK + 1);
           strcat(outputString, tempString);
 //
 //  Start place
@@ -2250,16 +2351,28 @@ BOOL FAR TMSRPT61(TMSRPTPassedDataDef *pPassedData)
           {
             tempLong = RUNSVIEW[nK].startOfPieceExtraboardStart;
           }
+          if(tempLong % 60 != 0)
+          {
+            tempLong += 30;
+          }
           sprintf(tempString, "%ld,", tempLong);
           strcat(outputString, tempString);
 //
 //  Start time of piece
 //
+          if(RUNSVIEW[nK].runOnTime % 60 != 0)
+          {
+            RUNSVIEW[nK].runOnTime += 30;
+          }
           sprintf(tempString, "%ld,", RUNSVIEW[nK].runOnTime);
           strcat(outputString, tempString);
 //
 //  End time of piece
 //
+          if(RUNSVIEW[nK].runOffTime % 60 != 0)
+          {
+            RUNSVIEW[nK].runOffTime += 30;
+          }
           sprintf(tempString, "%ld,", RUNSVIEW[nK].runOffTime);
           strcat(outputString, tempString);
 //
@@ -2269,6 +2382,10 @@ BOOL FAR TMSRPT61(TMSRPTPassedDataDef *pPassedData)
           if(RUNSVIEW[nK].endOfPieceExtraboardEnd != NO_TIME)
           {
             tempLong = RUNSVIEW[nK].endOfPieceExtraboardEnd;
+          }
+          if(tempLong % 60 != 0)
+          {
+            tempLong += 30;
           }
           sprintf(tempString, "%ld,", tempLong);
           strcat(outputString, tempString);
@@ -2289,11 +2406,11 @@ BOOL FAR TMSRPT61(TMSRPTPassedDataDef *pPassedData)
         }  // nK
       }  // while
     }  // nJ
-  }  // nI
 //
 //  Close the file
 //
   _lclose(hfOutputFile);
+  }  // nI
 //
 //  =========================================
 //  Transfer Request File - treq<bbbbbbb>.dat
@@ -2337,18 +2454,25 @@ BOOL FAR TMSRPT61(TMSRPTPassedDataDef *pPassedData)
       break;
     }
 //
+//  Don't unload this route if it's been marked as INACTIVE
+//
+    bFound = (ROUTES.COMMENTSrecordID == inactiveRecordID);
+//
 //  There have to be trips on this route and service
 //
-    TRIPSKey1.ROUTESrecordID = ROUTES.recordID;
-    TRIPSKey1.SERVICESrecordID = 0;
-    TRIPSKey1.directionIndex = 0;
-    TRIPSKey1.tripSequence = NO_RECORD;
-    rcode2 = btrieve(B_GETGREATER, TMS_TRIPS, &TRIPS, &TRIPSKey1, 1);
-    if(rcode2 == 0 &&
-          TRIPS.ROUTESrecordID == ROUTES.recordID)
+    if(!bFound)
     {
-      routeList[numRoutes] = ROUTES.recordID;
-      numRoutes++;
+      TRIPSKey1.ROUTESrecordID = ROUTES.recordID;
+      TRIPSKey1.SERVICESrecordID = 0;
+      TRIPSKey1.directionIndex = 0;
+      TRIPSKey1.tripSequence = NO_RECORD;
+      rcode2 = btrieve(B_GETGREATER, TMS_TRIPS, &TRIPS, &TRIPSKey1, 1);
+      if(rcode2 == 0 &&
+            TRIPS.ROUTESrecordID == ROUTES.recordID)
+      {
+        routeList[numRoutes] = ROUTES.recordID;
+        numRoutes++;
+      }
     }
 //
 //  Get the next route
@@ -2389,6 +2513,9 @@ BOOL FAR TMSRPT61(TMSRPTPassedDataDef *pPassedData)
 //
     ROUTESKey0.recordID = routeList[nI];
     btrieve(B_GETEQUAL, TMS_ROUTES, &ROUTES, &ROUTESKey0, 0);
+//
+//  Go through the directions
+//
     for(nJ = 0; nJ < 2; nJ++)
     {
       if(numTREQ >= TMSRPT61_MAXTREQ)
@@ -2563,18 +2690,28 @@ BOOL FAR TMSRPT61(TMSRPTPassedDataDef *pPassedData)
 //  Origin Route ID - Make it as close to "Route Short Name" as possible
 //  This takes aplhas into account and outputs them 62A to 621, 62B to 622, and so on.
 //
-    strncpy(tempString, ROUTES.number, ROUTES_NUMBER_LENGTH);
-    trim(tempString, ROUTES_NUMBER_LENGTH);
-    tempString[RTEFILE_ROUTENUMBER_LENGTH] = '\0';
-    ptr = tempString;
-    while(*ptr)
+//  New: If there's an alternate route number (numeric only) use that instead
+//
+    if(ROUTES.alternate > 0)
     {
-      if(isalpha(*ptr))
-      {
-        *ptr -= 16;
-      }
-      ptr++;
+      sprintf(tempString, "%ld", ROUTES.alternate);
+      pad(tempString, RTEFILE_ROUTENUMBER_LENGTH);
     }
+    else
+    {
+      strncpy(tempString, ROUTES.number, ROUTES_NUMBER_LENGTH);
+      trim(tempString, ROUTES_NUMBER_LENGTH);
+    }
+    tempString[RTEFILE_ROUTENUMBER_LENGTH] = '\0';
+//    ptr = tempString;
+//    while(*ptr)
+//    {
+//      if(isalpha(*ptr))
+//      {
+//        *ptr -= 16;
+//      }
+//      ptr++;
+//    }
     strcat(outputString, tempString);
     strcat(outputString, ",");
 //
@@ -2608,18 +2745,28 @@ BOOL FAR TMSRPT61(TMSRPTPassedDataDef *pPassedData)
 //  Destination Route ID - Make it as close to "Route Short Name" as possible
 //  This takes aplhas into account and outputs them 62A to 621, 62B to 622, and so on.
 //
-    strncpy(tempString, ROUTES.number, ROUTES_NUMBER_LENGTH);
-    trim(tempString, ROUTES_NUMBER_LENGTH);
-    tempString[RTEFILE_ROUTENUMBER_LENGTH] = '\0';
-    ptr = tempString;
-    while(*ptr)
+//  New: If there's an alternate route number (numeric only) use that instead
+//
+    if(ROUTES.alternate > 0)
     {
-      if(isalpha(*ptr))
-      {
-        *ptr -= 16;
-      }
-      ptr++;
+      sprintf(tempString, "%ld", ROUTES.alternate);
+      pad(tempString, RTEFILE_ROUTENUMBER_LENGTH);
     }
+    else
+    {
+      strncpy(tempString, ROUTES.number, ROUTES_NUMBER_LENGTH);
+      trim(tempString, ROUTES_NUMBER_LENGTH);
+    }
+    tempString[RTEFILE_ROUTENUMBER_LENGTH] = '\0';
+//    ptr = tempString;
+//    while(*ptr)
+//    {
+//      if(isalpha(*ptr))
+//      {
+//        *ptr -= 16;
+//      }
+//      ptr++;
+//    }
     strcat(outputString, tempString);
     strcat(outputString, ",");
 //
@@ -2809,6 +2956,13 @@ BOOL FAR TMSRPT61(TMSRPTPassedDataDef *pPassedData)
         continue;
       }
 //
+//  Don't unload this route if it's been marked as INACTIVE
+//
+      if(ROUTES.COMMENTSrecordID == inactiveRecordID)
+      {
+        break;
+      }  
+//
 //  There must be patterns on this route to record virtual timepoints
 //
       PATTERNSKey2.ROUTESrecordID = ROUTES.recordID;
@@ -2852,18 +3006,28 @@ BOOL FAR TMSRPT61(TMSRPTPassedDataDef *pPassedData)
 //  Route ID - Make it as close to "Route Short Name" as possible
 //  This takes aplhas into account and outputs them 62A to 621, 62B to 622, and so on.
 //
-      strncpy(tempString, ROUTES.number, ROUTES_NUMBER_LENGTH);
-      trim(tempString, ROUTES_NUMBER_LENGTH);
-      tempString[RTEFILE_ROUTENUMBER_LENGTH] = '\0';
-      ptr = tempString;
-      while(*ptr)
+//  New: If there's an alternate route number (numeric only) use that instead
+//
+      if(ROUTES.alternate > 0)
       {
-        if(isalpha(*ptr))
-        {
-          *ptr -= 16;
-        }
-        ptr++;
+        sprintf(tempString, "%ld", ROUTES.alternate);
+        pad(tempString, RTEFILE_ROUTENUMBER_LENGTH);
       }
+      else
+      {
+        strncpy(tempString, ROUTES.number, ROUTES_NUMBER_LENGTH);
+        trim(tempString, ROUTES_NUMBER_LENGTH);
+      }
+      tempString[RTEFILE_ROUTENUMBER_LENGTH] = '\0';
+//      ptr = tempString;
+//      while(*ptr)
+//      {
+//        if(isalpha(*ptr))
+//        {
+//          *ptr -= 16;
+//        }
+//        ptr++;
+//      }
       strcat(outputString, tempString);
       strcat(outputString, ",");
 //
@@ -2877,9 +3041,6 @@ BOOL FAR TMSRPT61(TMSRPTPassedDataDef *pPassedData)
 //
       strcpy(MIFPASSEDDATA.szMIFFileName, szRouteTracingsFolder);
       strcat(MIFPASSEDDATA.szMIFFileName, "\\rt");
-      strncpy(tempString, ROUTES.number, ROUTES_NUMBER_LENGTH);
-      trim(tempString, ROUTES_NUMBER_LENGTH);
-      tempString[RTEFILE_ROUTENUMBER_LENGTH] = '\0';
 //      if(isalpha(tempString[strlen(tempString) - 1]))
 //      {
 //        tempString[strlen(tempString) - 1] -= 16;
@@ -2888,7 +3049,7 @@ BOOL FAR TMSRPT61(TMSRPTPassedDataDef *pPassedData)
 //      {
 //        strcat(tempString, "0");
 //      }
-      ptr = tempString;
+/*      ptr = tempString;
       while(*ptr)
       {
         if(isalpha(*ptr))
@@ -2898,6 +3059,11 @@ BOOL FAR TMSRPT61(TMSRPTPassedDataDef *pPassedData)
         ptr++;
       }
       sprintf(szarString, "%07ld%d", atol(tempString), nI);
+*/
+      strncpy(tempString, ROUTES.number, ROUTES_NUMBER_LENGTH);
+      trim(tempString, ROUTES_NUMBER_LENGTH);
+      tempString[RTEFILE_ROUTENUMBER_LENGTH] = '\0';
+      sprintf(szarString, "%s%d", tempString, nI);
       strcat(MIFPASSEDDATA.szMIFFileName, szarString);
       strcat(szarString, "\r\n");
       _lwrite(hfErrorLog, szarString, strlen(szarString));
@@ -2921,118 +3087,144 @@ BOOL FAR TMSRPT61(TMSRPTPassedDataDef *pPassedData)
       {
         PATTERNNAMESrecordID = PATTERNS.PATTERNNAMESrecordID;
 //
+//  Active (Find a trip with this pattern on this route/ser/dir)
+//
+//        TRIPSKey1.ROUTESrecordID = ROUTES.recordID;
+//        TRIPSKey1.SERVICESrecordID = 1;
+//        TRIPSKey1.directionIndex = nI;
+//        TRIPSKey1.tripSequence = NO_RECORD;
+//        rcode2 = btrieve(B_GETGREATER, TMS_TRIPS, &TRIPS, &TRIPSKey1, 1);
+//        bActive = FALSE;
+//        while(rcode2 == 0 &&
+//              TRIPS.ROUTESrecordID == ROUTES.recordID &&
+//              TRIPS.SERVICESrecordID == 1 &&
+//              TRIPS.directionIndex == nI)
+//        {
+//          if(TRIPS.PATTERNNAMESrecordID == PATTERNS.PATTERNNAMESrecordID)
+//          {
+            bActive = TRUE;
+//            break;
+//          }
+//          rcode2 = btrieve(B_GETNEXT, TMS_TRIPS, &TRIPS, &TRIPSKey1, 1);
+//        }
+//
+//  Must be active (at least one trip built on it)
+//
+        if(bActive)
+        {
+//
 //  Build the MIFLINES structure based on this pattern
 //
-        if(ROUTES.recordID == 14)
-        {
-          previousFareCode = NO_RECORD;
-        }
-        MIFPASSEDDATA.ROUTESrecordID = ROUTES.recordID;
-        MIFPASSEDDATA.SERVICESrecordID = 1L;
-        MIFPASSEDDATA.directionIndex = nI;
-        MIFPASSEDDATA.PATTERNNAMESrecordID = PATTERNNAMESrecordID;
-        MIFPASSEDDATA.hfErrorLog = hfErrorLog;
-        numMIFLINES = MIFDigest(&MIFPASSEDDATA, &MIFLINES[0]);
-        if(numMIFLINES >= TMSRPT61_MAXMIFLINES)
-        {
-          sprintf(tempString, "*ERR - Number of MIF Lines exceeds %d\r\n", TMSRPT61_MAXMIFLINES);
-          _lwrite(hfErrorLog, tempString, strlen(tempString));
-          bGotError = TRUE;
-        }
+          if(ROUTES.recordID == 14)
+          {
+            previousFareCode = NO_RECORD;
+          }
+          MIFPASSEDDATA.ROUTESrecordID = ROUTES.recordID;
+          MIFPASSEDDATA.SERVICESrecordID = 1L;
+          MIFPASSEDDATA.directionIndex = nI;
+          MIFPASSEDDATA.PATTERNNAMESrecordID = PATTERNNAMESrecordID;
+          MIFPASSEDDATA.hfErrorLog = hfErrorLog;
+          numMIFLINES = MIFDigest(&MIFPASSEDDATA, &MIFLINES[0]);
+          if(numMIFLINES >= TMSRPT61_MAXMIFLINES)
+          {
+            sprintf(tempString, "*ERR - Number of MIF Lines exceeds %d\r\n", TMSRPT61_MAXMIFLINES);
+            _lwrite(hfErrorLog, tempString, strlen(tempString));
+            bGotError = TRUE;
+          }
 #define DUMPLINES
 
 #ifdef DUMPLINES
-        sprintf(tempString, "*Inf - Dump of line arrangement in map\r\n");
-        _lwrite(hfErrorLog, tempString, strlen(tempString));
-        for(nJ = 0; nJ < numMIFLINES; nJ++)
-        {
-          pFrom = &MIFLINES[nJ].from;
-          pTo = &MIFLINES[nJ].to;
+          sprintf(tempString, "*Inf - Dump of line arrangement in map\r\n");
+          _lwrite(hfErrorLog, tempString, strlen(tempString));
+          for(nJ = 0; nJ < numMIFLINES; nJ++)
+          {
+            pFrom = &MIFLINES[nJ].from;
+            pTo = &MIFLINES[nJ].to;
 //
 //  From Node
 //
-          if(pFrom->NODESrecordID == NO_RECORD)
-          {
-            strcpy(szFromNode, "");
-          }
-          else
-          {
-            NODESKey0.recordID = pFrom->NODESrecordID;
-            btrieve(B_GETEQUAL, TMS_NODES, &NODES, &NODESKey0, 0);
-            strncpy(szFromNode, NODES.abbrName, NODES_ABBRNAME_LENGTH);
-            trim(szFromNode, NODES_ABBRNAME_LENGTH);
-          }
+            if(pFrom->NODESrecordID == NO_RECORD)
+            {
+              strcpy(szFromNode, "");
+            }
+            else
+            {
+              NODESKey0.recordID = pFrom->NODESrecordID;
+              btrieve(B_GETEQUAL, TMS_NODES, &NODES, &NODESKey0, 0);
+              strncpy(szFromNode, NODES.abbrName, NODES_ABBRNAME_LENGTH);
+              trim(szFromNode, NODES_ABBRNAME_LENGTH);
+            }
 //
 //  To Node
 //
-          if(pTo->NODESrecordID == NO_RECORD)
-          {
-            strcpy(szToNode, "");
-          }
-          else
-          {
-            NODESKey0.recordID = pTo->NODESrecordID;
-            btrieve(B_GETEQUAL, TMS_NODES, &NODES, &NODESKey0, 0);
-            strncpy(szToNode, NODES.abbrName, NODES_ABBRNAME_LENGTH);
-            trim(szToNode, NODES_ABBRNAME_LENGTH);
-          }
+            if(pTo->NODESrecordID == NO_RECORD)
+            {
+              strcpy(szToNode, "");
+            }
+            else
+            {
+              NODESKey0.recordID = pTo->NODESrecordID;
+              btrieve(B_GETEQUAL, TMS_NODES, &NODES, &NODESKey0, 0);
+              strncpy(szToNode, NODES.abbrName, NODES_ABBRNAME_LENGTH);
+              trim(szToNode, NODES_ABBRNAME_LENGTH);
+            }
 //
 //  From stop
 //
-          if(pFrom->associatedStopNODESrecordID == NO_RECORD)
-          {
-            strcpy(szFromStop, "");
-          }
-          else
-          {
-            NODESKey0.recordID = pFrom->associatedStopNODESrecordID;
-            btrieve(B_GETEQUAL, TMS_NODES, &NODES, &NODESKey0, 0);
-            strncpy(szFromStop, NODES.longName, NODES_LONGNAME_LENGTH);
-            trim(szFromStop, NODES_LONGNAME_LENGTH);
-          }
+            if(pFrom->associatedStopNODESrecordID == NO_RECORD)
+            {
+              strcpy(szFromStop, "");
+            }
+            else
+            {
+              NODESKey0.recordID = pFrom->associatedStopNODESrecordID;
+              btrieve(B_GETEQUAL, TMS_NODES, &NODES, &NODESKey0, 0);
+              strncpy(szFromStop, NODES.longName, NODES_LONGNAME_LENGTH);
+              trim(szFromStop, NODES_LONGNAME_LENGTH);
+            }
 //
 //  To stop
 //
-          if(pTo->associatedStopNODESrecordID == NO_RECORD)
-          {
-            strcpy(szToStop, "");
+            if(pTo->associatedStopNODESrecordID == NO_RECORD)
+            {
+              strcpy(szToStop, "");
+            }
+            else
+            {
+              NODESKey0.recordID = pTo->associatedStopNODESrecordID;
+              btrieve(B_GETEQUAL, TMS_NODES, &NODES, &NODESKey0, 0);
+              strncpy(szToStop, NODES.longName, NODES_LONGNAME_LENGTH);
+              trim(szToStop, NODES_LONGNAME_LENGTH);
+            }
+            sprintf(tempString, "%4d,\"%4s\",\"%4s\",%10.7f,%10.7f,\"%4s\",\"%4s\",%10.7f,%10.7f\r\n", nJ,
+                  szFromNode, szFromStop, pFrom->longitude, pFrom->latitude,
+                  szToNode, szToStop, pTo->longitude, pTo->latitude);
+            _lwrite(hfErrorLog, tempString, strlen(tempString));
           }
-          else
-          {
-            NODESKey0.recordID = pTo->associatedStopNODESrecordID;
-            btrieve(B_GETEQUAL, TMS_NODES, &NODES, &NODESKey0, 0);
-            strncpy(szToStop, NODES.longName, NODES_LONGNAME_LENGTH);
-            trim(szToStop, NODES_LONGNAME_LENGTH);
-          }
-          sprintf(tempString, "%4d,\"%4s\",\"%4s\",%10.7f,%10.7f,\"%4s\",\"%4s\",%10.7f,%10.7f\r\n", nJ,
-                szFromNode, szFromStop, pFrom->longitude, pFrom->latitude,
-                szToNode, szToStop, pTo->longitude, pTo->latitude);
-          _lwrite(hfErrorLog, tempString, strlen(tempString));
-        }
 #endif
 //
 //  Pattern name
 //
-        PATTERNNAMESKey0.recordID = PATTERNNAMESrecordID;
-        btrieve(B_GETEQUAL, TMS_PATTERNNAMES, &PATTERNNAMES, &PATTERNNAMESKey0, 0);
-        strncpy(szPatternName, PATTERNNAMES.name, PATTERNNAMES_NAME_LENGTH);
-        trim(szPatternName, PATTERNNAMES_NAME_LENGTH);
-        szPatternName[VTPFILE_PATTERNNAME_LENGTH] = '\0';
+          PATTERNNAMESKey0.recordID = PATTERNNAMESrecordID;
+          btrieve(B_GETEQUAL, TMS_PATTERNNAMES, &PATTERNNAMES, &PATTERNNAMESKey0, 0);
+          strncpy(szPatternName, PATTERNNAMES.name, PATTERNNAMES_NAME_LENGTH);
+          trim(szPatternName, PATTERNNAMES_NAME_LENGTH);
+          szPatternName[VTPFILE_PATTERNNAME_LENGTH] = '\0';
 //
 //  Output the pattern data
 //
-        previousFareCode = NO_RECORD;
+          previousFareCode = NO_RECORD;
 //
 //  For mid-trip layovers, we need to add an extra output record
 //
-        totalOutputLines = numMIFLINES;
-        for(nJ = 0; nJ < numMIFLINES; nJ++)
-        {
-          if(MIFLINES[nJ].flags & MIFLINES_FLAG_NEXTISSAMELOCATION)
+          totalOutputLines = numMIFLINES;
+          for(nJ = 0; nJ < numMIFLINES; nJ++)
           {
-            totalOutputLines++;
+            if(MIFLINES[nJ].flags & MIFLINES_FLAG_NEXTISSAMELOCATION)
+            {
+              totalOutputLines++;
+            }
           }
-        }
 //
 //  There are nine cases of timepoints and/or bus stops netween two named points.
 //  A node can be a) a timepoint b) a stop c) a timepoint with an associated stop
@@ -3040,349 +3232,83 @@ BOOL FAR TMSRPT61(TMSRPTPassedDataDef *pPassedData)
 //  MIFLINES contains node and associated stop data.
 //  MIFPASSEDDATA contains an in-order list of the nodes/stops
 //
-        seq = 0;
-        outputSeq = 1;
-        for(nJ = 0; nJ < numMIFLINES; nJ++)
-        {
-          fromNODESrecordID = MIFPASSEDDATA.NODESrecordIDs[seq];
-          toNODESrecordID = MIFPASSEDDATA.NODESrecordIDs[seq + 1];
-          pFrom = &MIFLINES[nJ].from;
-          pTo = &MIFLINES[nJ].to;
+          seq = 0;
+          outputSeq = 1;
+          for(nJ = 0; nJ < numMIFLINES; nJ++)
+          {
+            fromNODESrecordID = MIFPASSEDDATA.NODESrecordIDs[seq];
+            toNODESrecordID = MIFPASSEDDATA.NODESrecordIDs[seq + 1];
+            pFrom = &MIFLINES[nJ].from;
+            pTo = &MIFLINES[nJ].to;
 //
 //  Who's a stop?
 //
-          bFromIsAStop = pFrom->flags & PATTERNS_FLAG_BUSSTOP;
-          bToIsAStop = pTo->flags & PATTERNS_FLAG_BUSSTOP;
+            bFromIsAStop = pFrom->flags & PATTERNS_FLAG_BUSSTOP;
+            bToIsAStop = pTo->flags & PATTERNS_FLAG_BUSSTOP;
 //
 //  Determine abbreviated names for nodes/stops
 //
 //  From Node
 //
-          if(pFrom->NODESrecordID == NO_RECORD)
-          {
-            pFrom->NODESrecordID = 0;
-            strcpy(szFromNode, "");
-          }
-          else
-          {
-            NODESKey0.recordID = pFrom->NODESrecordID;
-            btrieve(B_GETEQUAL, TMS_NODES, &NODES, &NODESKey0, 0);
-            strncpy(szFromNode, NODES.abbrName, NODES_ABBRNAME_LENGTH);
-            trim(szFromNode, NODES_ABBRNAME_LENGTH);
-          }
-//
-//  To Node
-//
-          if(pTo->NODESrecordID == NO_RECORD)
-          {
-            pTo->NODESrecordID = 0;
-            strcpy(szToNode, "");
-          }
-          else
-          {
-            NODESKey0.recordID = pTo->NODESrecordID;
-            btrieve(B_GETEQUAL, TMS_NODES, &NODES, &NODESKey0, 0);
-            strncpy(szToNode, NODES.abbrName, NODES_ABBRNAME_LENGTH);
-            trim(szToNode, NODES_ABBRNAME_LENGTH);
-          }
-//
-//  From stop
-//
-          if(pFrom->associatedStopNODESrecordID == NO_RECORD)
-          {
-            pFrom->associatedStopNODESrecordID = 0;
-            strcpy(szFromStop, "");
-          }
-          else
-          {
-            NODESKey0.recordID = pFrom->associatedStopNODESrecordID;
-            btrieve(B_GETEQUAL, TMS_NODES, &NODES, &NODESKey0, 0);
-            strncpy(szFromStop, NODES.longName, NODES_LONGNAME_LENGTH);
-            trim(szFromStop, NODES_LONGNAME_LENGTH);
-          }
-//
-//  To stop
-//
-          if(pTo->associatedStopNODESrecordID == NO_RECORD)
-          {
-            pTo->associatedStopNODESrecordID = 0;
-            strcpy(szToStop, "");
-          }
-          else
-          {
-            NODESKey0.recordID = pTo->associatedStopNODESrecordID;
-            btrieve(B_GETEQUAL, TMS_NODES, &NODES, &NODESKey0, 0);
-            strncpy(szToStop, NODES.longName, NODES_LONGNAME_LENGTH);
-            trim(szToStop, NODES_LONGNAME_LENGTH);
-          }
-//
-//  Ressurect the outputString
-//
-          strcpy(outputString, outputStringSave);
-//
-//  Pattern name
-//
-          strcat(outputString, szPatternName);
-          strcat(outputString, ",");
-//
-//  Line number
-//
-          sprintf(tempString, "%d,", outputSeq++);
-          strcat(outputString, tempString);
-//
-//  Total output lines
-//
-          sprintf(tempString, "%d,", totalOutputLines);
-          strcat(outputString, tempString);
-//
-//  Determine output precidence
-//
-          TPBS = NO_RECORD;
-          strcpy(tempString, ",,");
-          if(!bFromIsAStop)  // first not a stop second a stop
-          {
-            if(bToIsAStop)
+            if(pFrom->NODESrecordID == NO_RECORD)
             {
-              if(pFrom->associatedStopNODESrecordID != 0)
-              {
-                TPBS = VTPFILE_TPBS_NODESTOPTOSTOP;  // case 1
-              }
-              else
-              {
-                TPBS = VTPFILE_TPBS_NODETOSTOP;  // case 2
-              }
-              sprintf(tempString, "%s,,", szFromNode);
-            }
-            else  // first not a stop second not a stop
-            {
-              if(pFrom->associatedStopNODESrecordID != 0)
-              {
-                if(pTo->associatedStopNODESrecordID != 0)
-                {
-                  TPBS = VTPFILE_TPBS_NODESTOPTONODESTOP;  // case 8
-                }
-                else
-                {
-                  TPBS = VTPFILE_TPBS_NODESTOPTONODE;  // case 9
-                }
-              }
-              else
-              {
-                if(pTo->associatedStopNODESrecordID != 0)
-                {
-                  TPBS = VTPFILE_TPBS_NODETONODESTOP;  // case 4
-                }
-                else
-                {
-                  TPBS = VTPFILE_TPBS_NODETONODE;  // case 3
-                }
-              }
-            }
-            sprintf(tempString, "%s,%s,", szFromNode, szToNode);
-          }
-          else  // first a stop
-          {
-            if(bToIsAStop)
-            {
-              TPBS = VTPFILE_TPBS_STOPTOSTOP;  // case 5
+              pFrom->NODESrecordID = 0;
+              strcpy(szFromNode, "");
             }
             else
             {
-              if(pTo->associatedStopNODESrecordID != 0)
-              {
-                TPBS = VTPFILE_TPBS_STOPTONODESTOP;  // case 7
-              }
-              else
-              {
-                TPBS = VTPFILE_TPBS_STOPTONODE;  // case 6
-              }
-              sprintf(tempString, ",%s,", szToNode); 
+              NODESKey0.recordID = pFrom->NODESrecordID;
+              btrieve(B_GETEQUAL, TMS_NODES, &NODES, &NODESKey0, 0);
+              strncpy(szFromNode, NODES.abbrName, NODES_ABBRNAME_LENGTH);
+              trim(szFromNode, NODES_ABBRNAME_LENGTH);
             }
-          }
 //
-//  Add the string
+//  To Node
 //
-          strcat(outputString, tempString);
+            if(pTo->NODESrecordID == NO_RECORD)
+            {
+              pTo->NODESrecordID = 0;
+              strcpy(szToNode, "");
+            }
+            else
+            {
+              NODESKey0.recordID = pTo->NODESrecordID;
+              btrieve(B_GETEQUAL, TMS_NODES, &NODES, &NODESKey0, 0);
+              strncpy(szToNode, NODES.abbrName, NODES_ABBRNAME_LENGTH);
+              trim(szToNode, NODES_ABBRNAME_LENGTH);
+            }
 //
-//  From longitude and latitude
+//  From stop
 //
-          sprintf(szarString, "%12.6f,", pFrom->longitude);
-          ptr = szarString;
-          while(ptr && *ptr == ' ')
-          {
-            ptr++;
-          }
-          strcat(outputString, ptr);
-          sprintf(szarString, "%12.6f,", pFrom->latitude);
-          ptr = szarString;
-          while(ptr && *ptr == ' ')
-          {
-            ptr++;
-          }
-          strcat(outputString, ptr);
+            if(pFrom->associatedStopNODESrecordID == NO_RECORD)
+            {
+              pFrom->associatedStopNODESrecordID = 0;
+              strcpy(szFromStop, "");
+            }
+            else
+            {
+              NODESKey0.recordID = pFrom->associatedStopNODESrecordID;
+              btrieve(B_GETEQUAL, TMS_NODES, &NODES, &NODESKey0, 0);
+              strncpy(szFromStop, NODES.longName, NODES_LONGNAME_LENGTH);
+              trim(szFromStop, NODES_LONGNAME_LENGTH);
+            }
 //
-//  To longitude and latitude
+//  To stop
 //
-          sprintf(szarString, "%12.6f,", pTo->longitude);
-          ptr = szarString;
-          while(ptr && *ptr == ' ')
-          {
-            ptr++;
-          }
-          strcat(outputString, ptr);
-          sprintf(szarString, "%12.6f,", pTo->latitude);
-          ptr = szarString;
-          while(ptr && *ptr == ' ')
-          {
-            ptr++;
-          }
-          strcat(outputString, ptr);
+            if(pTo->associatedStopNODESrecordID == NO_RECORD)
+            {
+              pTo->associatedStopNODESrecordID = 0;
+              strcpy(szToStop, "");
+            }
+            else
+            {
+              NODESKey0.recordID = pTo->associatedStopNODESrecordID;
+              btrieve(B_GETEQUAL, TMS_NODES, &NODES, &NODESKey0, 0);
+              strncpy(szToStop, NODES.longName, NODES_LONGNAME_LENGTH);
+              trim(szToStop, NODES_LONGNAME_LENGTH);
+            }
 //
-//  Switch on the node/stop configuration
-//
-          bWriteRecord = TRUE;
-//
-//  In all cases, the following holds true:
-//    fromStopName is the szFromStop if it's a stop or associated stop, and blank otherwise
-//      toStopName is the szToStop   if it's a stop or associated stop, and blank otherwise
-//
-//  These two values precede the fromNode/toNode/fromStop/toStop below
-//
-          switch(TPBS)
-          {
-//
-//  case 1 - Node (with associated stop) to stop
-//  Gets: fromNode = Node, toNode = 0, fromStop = Associated Stop, toStop = stop
-//
-            case VTPFILE_TPBS_NODESTOPTOSTOP:
-              sprintf(tempString, "%s,%s,%ld,0,%ld,%ld,", szFromStop, szToStop,
-//                    pFrom->NODESrecordID, pFrom->associatedStopNODESrecordID, pTo->associatedStopNODESrecordID);
-                    pFrom->NODESrecordID, pFrom->associatedStopNumber, pTo->associatedStopNumber);
-              break;
-//
-//  case 2 - Node to a stop
-//  Gets: fromNode = Node, toNode = 0, fromStop = 0, toStop = Stop
-//  
-            case VTPFILE_TPBS_NODETOSTOP:
-              sprintf(tempString, ",%s,%ld,0,0,%ld,", szToStop,
-//                    pFrom->NODESrecordID, pTo->associatedStopNODESrecordID);
-                    pFrom->NODESrecordID, pTo->associatedStopNumber);
-              break;
-//
-//  case 3 - Node to a node
-//  Gets: fromNode = Node, toNode = Node, fromStop = 0, toStop = 0
-//
-            case VTPFILE_TPBS_NODETONODE:
-              sprintf(tempString, ",,%ld,%ld,0,0,",
-                    pFrom->NODESrecordID, pTo->NODESrecordID);
-              break;
-//
-//  case 4 - Node to a node (with associated stop)
-//  Gets: fromNode = Node, toNode = Node, fromStop = 0, toStop = Associated Stop
-//
-            case VTPFILE_TPBS_NODETONODESTOP:
-              sprintf(tempString, ",%s,%ld,%ld,0,%ld,", szToStop,
-//                    pFrom->NODESrecordID, pTo->NODESrecordID, pTo->associatedStopNODESrecordID);
-                    pFrom->NODESrecordID, pTo->NODESrecordID, pTo->associatedStopNumber);
-              break;
-//
-//  case 5 - Stop to a stop
-//  Gets: fromNode = 0, toNode = 0, fromStop = Stop, toStop = Stop
-//
-            case VTPFILE_TPBS_STOPTOSTOP:
-              sprintf(tempString, "%s,%s,0,0,%ld,%ld,", szFromStop, szToStop,
-//                    pFrom->associatedStopNODESrecordID, pTo->associatedStopNODESrecordID);
-                    pFrom->associatedStopNumber, pTo->associatedStopNumber);
-              break;
-//
-//  case 6 - Stop to a node
-//  Gets: fromNode = 0, toNode = Node, fromStop = Stop, toStop = 0
-//
-            case VTPFILE_TPBS_STOPTONODE:
-              sprintf(tempString, "%s,,0,%ld,%ld,0,", szFromStop,
-//                    pFrom->associatedStopNODESrecordID, pTo->NODESrecordID);
-                    pFrom->associatedStopNumber, pTo->NODESrecordID);
-              break;
-//
-//  case 7 - Stop to a node (with associated stop)
-//  Gets: fromNode = 0, toNode = Node, fromStop = Stop, toStop = Associated stop
-//
-            case VTPFILE_TPBS_STOPTONODESTOP:
-              sprintf(tempString, "%s,%s,0,%ld,%ld,%ld,", szFromStop, szToStop,
-//                    pTo->NODESrecordID, pFrom->associatedStopNODESrecordID, pTo->associatedStopNODESrecordID);
-                    pTo->NODESrecordID, pFrom->associatedStopNumber, pTo->associatedStopNumber);
-              break;
-//
-//  case 8 - Node (with associated stop) to node (with associated stop)
-//  Gets: fromNode = Node, toNode = Node, fromStop = Associated stop, toStop = Associated stop
-//
-            case VTPFILE_TPBS_NODESTOPTONODESTOP:
-              sprintf(tempString, "%s,%s,%ld,%ld,%ld,%ld,", szFromStop, szToStop,
-//                    pFrom->NODESrecordID, pTo->NODESrecordID, pFrom->associatedStopNODESrecordID, pTo->associatedStopNODESrecordID);
-                    pFrom->NODESrecordID, pTo->NODESrecordID, pFrom->associatedStopNumber, pTo->associatedStopNumber);
-              break;
-//
-//  case 9 - Node (with associated stop) to node
-//  Gets: fromNode = Node, toNode = 0, fromStop = Associated stop, toStop = Stop
-//
-            case VTPFILE_TPBS_NODESTOPTONODE:
-              sprintf(tempString, "%s,,%ld,0,%ld,%ld,", szFromStop,
-//                    pFrom->NODESrecordID, pFrom->associatedStopNODESrecordID, pTo->associatedStopNODESrecordID);
-                    pFrom->NODESrecordID, pFrom->associatedStopNumber, pTo->associatedStopNumber);
-              break;
-//
-//  Bad one - write a record to the error file
-//
-            default:
-              strncpy(szarString, ROUTES.number, ROUTES_NUMBER_LENGTH);
-              trim(szarString, ROUTES_NUMBER_LENGTH);
-              sprintf(tempString, "*ERR - Bad case in Virutal timepoint file.  Route: %s, from: %ld to %ld\r\n",
-                    szarString, pFrom->NODESrecordID, pTo->NODESrecordID);
-              _lwrite(hfErrorLog, tempString, strlen(tempString));
-              bWriteRecord = FALSE;
-              bGotError = TRUE;
-              break;
-          }  // switch
-//
-//  Add to the output string
-//
-          strcat(outputString, tempString);
-//
-//  First stop, secondary route (always 0)
-// 
-          strcat(outputString, "0,");
-//
-//  Fare code
-//
-          sprintf(tempString, "%d,", (fareCode == previousFareCode ? 0 : fareCode));
-          strcat(outputString, tempString);
-          previousFareCode = fareCode;
-//
-//  Cut point (always 0)
-//  
-          strcat(outputString, "0\r\n");
-//
-//  Write out the record
-//
-          if(bWriteRecord)
-          {
-            _lwrite(hfOutputFile, outputString, strlen(outputString));
-          }
-//
-//  If we've encountered a mid-trip layover, it gets a special record.
-//
-//  From Orbital:
-//    "To declare a mid-trip layover, the pattern in the VTP File must contain exactly one record where the
-//    'from timepoint name' and 'to timepoint name' fields are set to exactly the same non-null value.
-//    In the example case, they should both be set to 'LTCA'.  It wouldn't work to set one to 'LTCA' and
-//    the other to 'LTCD' because our software would interpret this as two distinct timepoints.  The following
-//    field pairs must also match:  'from timepoint id' = 'to timepoint id', 'from stop name' = 'to stop name',
-//    'from stop id' = 'to stop id', 'from longitude' = 'to longitude', 'from latitude' = 'to latitude'.
-//
-          if(bWriteRecord && (MIFLINES[nJ].flags & MIFLINES_FLAG_NEXTISSAMELOCATION))
-          {
-//
-//  The string to this point
+//  Ressurect the outputString
 //
             strcpy(outputString, outputStringSave);
 //
@@ -3391,7 +3317,7 @@ BOOL FAR TMSRPT61(TMSRPTPassedDataDef *pPassedData)
             strcat(outputString, szPatternName);
             strcat(outputString, ",");
 //
-//  Sequence number
+//  Line number
 //
             sprintf(tempString, "%d,", outputSeq++);
             strcat(outputString, tempString);
@@ -3401,12 +3327,93 @@ BOOL FAR TMSRPT61(TMSRPTPassedDataDef *pPassedData)
             sprintf(tempString, "%d,", totalOutputLines);
             strcat(outputString, tempString);
 //
-//  From and to timepoint names
+//  Determine output precidence
 //
-            sprintf(tempString, "%s,%s,", szToNode, szToNode);
+            TPBS = NO_RECORD;
+            strcpy(tempString, ",,");
+            if(!bFromIsAStop)  // first not a stop second a stop
+            {
+              if(bToIsAStop)
+              {
+                if(pFrom->associatedStopNODESrecordID != 0)
+                {
+                  TPBS = VTPFILE_TPBS_NODESTOPTOSTOP;  // case 1
+                }
+                else
+                {
+                  TPBS = VTPFILE_TPBS_NODETOSTOP;  // case 2
+                }
+                sprintf(tempString, "%s,,", szFromNode);
+              }
+              else  // first not a stop second not a stop
+              {
+                if(pFrom->associatedStopNODESrecordID != 0)
+                {
+                  if(pTo->associatedStopNODESrecordID != 0)
+                  {
+                    TPBS = VTPFILE_TPBS_NODESTOPTONODESTOP;  // case 8
+                  }
+                  else
+                  {
+                    TPBS = VTPFILE_TPBS_NODESTOPTONODE;  // case 9
+                  }
+                }
+                else
+                {
+                  if(pTo->associatedStopNODESrecordID != 0)
+                  {
+                    TPBS = VTPFILE_TPBS_NODETONODESTOP;  // case 4
+                  }
+                  else
+                  {
+                    TPBS = VTPFILE_TPBS_NODETONODE;  // case 3
+                  }
+                }
+              }
+              sprintf(tempString, "%s,%s,", szFromNode, szToNode);
+            }
+            else  // first a stop
+            {
+              if(bToIsAStop)
+              {
+                TPBS = VTPFILE_TPBS_STOPTOSTOP;  // case 5
+              }
+              else
+              {
+                if(pTo->associatedStopNODESrecordID != 0)
+                {
+                  TPBS = VTPFILE_TPBS_STOPTONODESTOP;  // case 7
+                }
+                else
+                {
+                  TPBS = VTPFILE_TPBS_STOPTONODE;  // case 6
+                }
+                sprintf(tempString, ",%s,", szToNode); 
+              }
+            }
+//
+//  Add the string
+//
             strcat(outputString, tempString);
 //
-//  Longitude and latitude
+//  From longitude and latitude
+//
+            sprintf(szarString, "%12.6f,", pFrom->longitude);
+            ptr = szarString;
+            while(ptr && *ptr == ' ')
+            {
+              ptr++;
+            }
+            strcat(outputString, ptr);
+            sprintf(szarString, "%12.6f,", pFrom->latitude);
+            ptr = szarString;
+            while(ptr && *ptr == ' ')
+            {
+              ptr++;
+            }
+            strcat(outputString, ptr);
+//
+//  To longitude and latitude
 //
             sprintf(szarString, "%12.6f,", pTo->longitude);
             ptr = szarString;
@@ -3414,27 +3421,115 @@ BOOL FAR TMSRPT61(TMSRPTPassedDataDef *pPassedData)
             {
               ptr++;
             }
-            strcpy(tempString, ptr);
+            strcat(outputString, ptr);
             sprintf(szarString, "%12.6f,", pTo->latitude);
             ptr = szarString;
             while(ptr && *ptr == ' ')
             {
               ptr++;
             }
-            strcat(tempString, ptr);
+            strcat(outputString, ptr);
 //
-//  (repeated)
+//  Switch on the node/stop configuration
 //
-            strcat(outputString, tempString);
-            strcat(outputString, tempString);
+            bWriteRecord = TRUE;
 //
-//  Stop / NODESrecordID / associatedStopNODESrecordID
+//  In all cases, the following holds true:
+//    fromStopName is the szFromStop if it's a stop or associated stop, and blank otherwise
+//      toStopName is the szToStop   if it's a stop or associated stop, and blank otherwise
 //
-//            sprintf(tempString, "%s,%s,%ld,%ld,%ld,%ld,", szToStop, szToStop,
-//                  pTo->NODESrecordID, pTo->NODESrecordID, pTo->associatedStopNODESrecordID, pTo->associatedStopNODESrecordID);
-            nK = atoi(&szToStop[4]);
-            sprintf(tempString, "%s,%s,%ld,%ld,%d,%d,", szToStop, szToStop,
-                  pTo->NODESrecordID, pTo->NODESrecordID, nK, nK);
+//  These two values precede the fromNode/toNode/fromStop/toStop below
+//
+            switch(TPBS)
+            {
+//
+//  case 1 - Node (with associated stop) to stop
+//  Gets: fromNode = Node, toNode = 0, fromStop = Associated Stop, toStop = stop
+//
+              case VTPFILE_TPBS_NODESTOPTOSTOP:
+                sprintf(tempString, "%s,%s,%ld,0,%ld,%ld,", szFromStop, szToStop,
+                      pFrom->NODESrecordID, pFrom->associatedStopNumber, pTo->associatedStopNumber);
+                break;
+//
+//  case 2 - Node to a stop
+//  Gets: fromNode = Node, toNode = 0, fromStop = 0, toStop = Stop
+//  
+              case VTPFILE_TPBS_NODETOSTOP:
+                sprintf(tempString, ",%s,%ld,0,0,%ld,", szToStop,
+                      pFrom->NODESrecordID, pTo->associatedStopNumber);
+                break;
+//
+//  case 3 - Node to a node
+//  Gets: fromNode = Node, toNode = Node, fromStop = 0, toStop = 0
+//
+              case VTPFILE_TPBS_NODETONODE:
+                sprintf(tempString, ",,%ld,%ld,0,0,",
+                      pFrom->NODESrecordID, pTo->NODESrecordID);
+                break;
+//
+//  case 4 - Node to a node (with associated stop)
+//  Gets: fromNode = Node, toNode = Node, fromStop = 0, toStop = Associated Stop
+//
+              case VTPFILE_TPBS_NODETONODESTOP:
+                sprintf(tempString, ",%s,%ld,%ld,0,%ld,", szToStop,
+                      pFrom->NODESrecordID, pTo->NODESrecordID, pTo->associatedStopNumber);
+                break;
+//
+//  case 5 - Stop to a stop
+//  Gets: fromNode = 0, toNode = 0, fromStop = Stop, toStop = Stop
+//
+              case VTPFILE_TPBS_STOPTOSTOP:
+                sprintf(tempString, "%s,%s,0,0,%ld,%ld,", szFromStop, szToStop,
+                      pFrom->associatedStopNumber, pTo->associatedStopNumber);
+                break;
+//
+//  case 6 - Stop to a node
+//  Gets: fromNode = 0, toNode = Node, fromStop = Stop, toStop = 0
+//
+              case VTPFILE_TPBS_STOPTONODE:
+                sprintf(tempString, "%s,,0,%ld,%ld,0,", szFromStop,
+                      pFrom->associatedStopNumber, pTo->NODESrecordID);
+                break;
+//
+//  case 7 - Stop to a node (with associated stop)
+//  Gets: fromNode = 0, toNode = Node, fromStop = Stop, toStop = Associated stop
+//
+              case VTPFILE_TPBS_STOPTONODESTOP:
+                sprintf(tempString, "%s,%s,0,%ld,%ld,%ld,", szFromStop, szToStop,
+                      pTo->NODESrecordID, pFrom->associatedStopNumber, pTo->associatedStopNumber);
+                break;
+//
+//  case 8 - Node (with associated stop) to node (with associated stop)
+//  Gets: fromNode = Node, toNode = Node, fromStop = Associated stop, toStop = Associated stop
+//
+              case VTPFILE_TPBS_NODESTOPTONODESTOP:
+                sprintf(tempString, "%s,%s,%ld,%ld,%ld,%ld,", szFromStop, szToStop,
+                      pFrom->NODESrecordID, pTo->NODESrecordID, pFrom->associatedStopNumber, pTo->associatedStopNumber);
+                break;
+//
+//  case 9 - Node (with associated stop) to node
+//  Gets: fromNode = Node, toNode = 0, fromStop = Associated stop, toStop = Stop
+//
+              case VTPFILE_TPBS_NODESTOPTONODE:
+                sprintf(tempString, "%s,,%ld,0,%ld,%ld,", szFromStop,
+                      pFrom->NODESrecordID, pFrom->associatedStopNumber, pTo->associatedStopNumber);
+                break;
+//
+//  Bad one - write a record to the error file
+//
+              default:
+                strncpy(szarString, ROUTES.number, ROUTES_NUMBER_LENGTH);
+                trim(szarString, ROUTES_NUMBER_LENGTH);
+                sprintf(tempString, "*ERR - Bad case in Virutal timepoint file.  Route: %s, from: %ld to %ld\r\n",
+                      szarString, pFrom->NODESrecordID, pTo->NODESrecordID);
+                _lwrite(hfErrorLog, tempString, strlen(tempString));
+                bWriteRecord = FALSE;
+                bGotError = TRUE;
+                break;
+            }  // switch
+//
+//  Add to the output string
+//
             strcat(outputString, tempString);
 //
 //  First stop, secondary route (always 0)
@@ -3450,9 +3545,97 @@ BOOL FAR TMSRPT61(TMSRPTPassedDataDef *pPassedData)
 //  Cut point (always 0)
 //  
             strcat(outputString, "0\r\n");
-            _lwrite(hfOutputFile, outputString, strlen(outputString));
-          }  // Mid-trip layover
-        }  // nJ cycle through
+//
+//  Write out the record
+//
+            if(bWriteRecord)
+            {
+              _lwrite(hfOutputFile, outputString, strlen(outputString));
+            }
+//
+//  If we've encountered a mid-trip layover, it gets a special record.
+//
+//  From Orbital:
+//    "To declare a mid-trip layover, the pattern in the VTP File must contain exactly one record where the
+//    'from timepoint name' and 'to timepoint name' fields are set to exactly the same non-null value.
+//    In the example case, they should both be set to 'LTCA'.  It wouldn't work to set one to 'LTCA' and
+//    the other to 'LTCD' because our software would interpret this as two distinct timepoints.  The following
+//    field pairs must also match:  'from timepoint id' = 'to timepoint id', 'from stop name' = 'to stop name',
+//    'from stop id' = 'to stop id', 'from longitude' = 'to longitude', 'from latitude' = 'to latitude'.
+//
+            if(bWriteRecord && (MIFLINES[nJ].flags & MIFLINES_FLAG_NEXTISSAMELOCATION))
+            {
+//
+//  The string to this point
+//
+              strcpy(outputString, outputStringSave);
+//
+//  Pattern name
+//
+              strcat(outputString, szPatternName);
+              strcat(outputString, ",");
+//
+//  Sequence number
+//
+              sprintf(tempString, "%d,", outputSeq++);
+              strcat(outputString, tempString);
+//
+//  Total output lines
+//
+              sprintf(tempString, "%d,", totalOutputLines);
+              strcat(outputString, tempString);
+//
+//  From and to timepoint names
+//
+              sprintf(tempString, "%s,%s,", szToNode, szToNode);
+              strcat(outputString, tempString);
+//
+//  Longitude and latitude
+//
+              sprintf(szarString, "%12.6f,", pTo->longitude);
+              ptr = szarString;
+              while(ptr && *ptr == ' ')
+              {
+                ptr++;
+              }
+              strcpy(tempString, ptr);
+              sprintf(szarString, "%12.6f,", pTo->latitude);
+              ptr = szarString;
+              while(ptr && *ptr == ' ')
+              {
+                ptr++;
+              }
+              strcat(tempString, ptr);
+//
+//  (repeated)
+//
+              strcat(outputString, tempString);
+              strcat(outputString, tempString);
+//
+//  Stop / NODESrecordID / associatedStopNODESrecordID
+//
+              nK = atoi(&szToStop[4]);
+              sprintf(tempString, "%s,%s,%ld,%ld,%d,%d,", szToStop, szToStop,
+                    pTo->NODESrecordID, pTo->NODESrecordID, nK, nK);
+              strcat(outputString, tempString);
+//
+//  First stop, secondary route (always 0)
+// 
+              strcat(outputString, "0,");
+//
+//  Fare code
+//
+              sprintf(tempString, "%d,", (fareCode == previousFareCode ? 0 : fareCode));
+              strcat(outputString, tempString);
+              previousFareCode = fareCode;
+//
+//  Cut point (always 0)
+//  
+              strcat(outputString, "0\r\n");
+              _lwrite(hfOutputFile, outputString, strlen(outputString));
+            }  // Mid-trip layover
+          }  // nJ cycle through
+        }  // bActive
 //
 //  Get the next pattern
 //
@@ -3520,6 +3703,13 @@ BOOL FAR TMSRPT61(TMSRPTPassedDataDef *pPassedData)
       strncpy(tempString, NODES.longName, NODES_LONGNAME_LENGTH);
       trim(tempString, NODES_LONGNAME_LENGTH);
       tempLong = atol(&tempString[4]);
+//
+//  Or, if it comes out as zero, take it from the stop number field
+//
+      if(tempLong == 0)
+      {
+        tempLong = NODES.number;
+      }
       sprintf(tempString, "%ld,", tempLong);
       strcat(outputString, tempString);
 //
@@ -3754,6 +3944,78 @@ BOOL FAR TMSRPT61(TMSRPTPassedDataDef *pPassedData)
 //  Close the file
 //
   _lclose(hfOutputFile);
+//
+//  =============================================
+//  Divisions/Garages File - division_garages.dat
+//  =============================================
+//
+  if(StatusBarAbort())
+  {
+    goto done;
+  }
+  strcpy(outputFileName, "division_garages.dat");
+  hfOutputFile = _lcreat(outputFileName, 0);
+  if(hfOutputFile == HFILE_ERROR)
+  {
+    LoadString(hInst, ERROR_320, szFormatString, SZFORMATSTRING_LENGTH);
+    sprintf(szarString, szFormatString, outputFileName);
+    MessageBeep(MB_ICONSTOP);
+    MessageBox(NULL, szarString, TMS, MB_OK | MB_ICONSTOP);
+    goto done;
+  }
+  StatusBarText(outputFileName);
+//
+//  Cycle through the divisions
+//
+  rcode2 = btrieve(B_GETFIRST, TMS_DIVISIONS, &DIVISIONS, &DIVISIONSKey1, 1);
+  bFirst = TRUE;
+  for(nJ = 0; nJ < maxDivisions; nJ++)
+  {
+    if(StatusBarAbort())
+    {
+      goto done;
+    }
+    if(bFirst)
+    {
+      bFirst = FALSE;
+    }
+    else
+    {
+      rcode2 = btrieve(B_GETNEXT, TMS_DIVISIONS, &DIVISIONS, &DIVISIONSKey1, 1);
+      if(rcode2 != 0)
+      {
+        break;
+      }
+    }
+//
+//  Get the division name
+//
+    strncpy(szDivisionName, DIVISIONS.name, DIVISIONS_NAME_LENGTH);
+    trim(szDivisionName, DIVISIONS_NAME_LENGTH);
+//
+//  Go through the nodes and dump out each garage
+//
+    rcode2 = btrieve(B_GETFIRST, TMS_NODES, &NODES, &NODESKey0, 0);
+    while(rcode2 == 0)
+    {
+      if(NODES.flags & NODES_FLAG_GARAGE)
+      {
+        strncpy(tempString, NODES.abbrName, NODES_ABBRNAME_LENGTH);
+        trim(tempString, NODES_ABBRNAME_LENGTH);
+        strcpy(outputString, szDivisionName);
+        strcat(outputString, ",");
+        strcat(outputString, tempString);
+        strcat(outputString, "\r\n");
+       _lwrite(hfOutputFile, outputString, strlen(outputString));
+      }
+      rcode2 = btrieve(B_GETNEXT, TMS_NODES, &NODES, &NODESKey0, 0);
+    }
+  }
+//
+//  Close the file
+//
+  _lclose(hfOutputFile);
+
 //
 //  All done
 //

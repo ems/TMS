@@ -3428,6 +3428,1097 @@ typedef struct UniqueStruct
   }
 */
 //
+//  Onetime fix - Lima - Put the AbbrName in front of the description
+//  in the Nodes file for bus stops only.
+//
+/*
+  rcode2 = btrieve(B_GETFIRST, TMS_NODES, &NODES, &NODESKey0, 0);
+  while(rcode2 == 0)
+  {
+    if(NODES.flags & NODES_FLAG_STOP)
+    {
+      strncpy(tempString, NODES.abbrName, NODES_ABBRNAME_LENGTH);
+      trim(tempString, NODES_ABBRNAME_LENGTH);
+      strncpy(szarString, NODES.description, NODES_DESCRIPTION_LENGTH);
+      trim(szarString, NODES_DESCRIPTION_LENGTH);
+      strcat(tempString, " - ");
+      strcat(tempString, szarString);
+      pad(tempString, NODES_DESCRIPTION_LENGTH);
+      strncpy(NODES.description, tempString, NODES_DESCRIPTION_LENGTH);
+      rcode2 = btrieve(B_UPDATE, TMS_NODES, &NODES, &NODESKey0, 0);
+    }
+    rcode2 = btrieve(B_GETNEXT, TMS_NODES, &NODES, &NODESKey0, 0);
+  }
+*/
+//
+//  Onetime fix - Bridgeport - Add a stop record when there isn't one
+//  that's quoted as a stop association
+//
+/*
+  BOOL bDone;
+  BOOL bGotOne;
+  long recordID;
+  long newRecordID;
+  NODESDef N;
+  rcode2 = btrieve(B_GETFIRST, TMS_NODES, &NODES, &NODESKey0, 0);
+  while(rcode2 == 0)
+  {
+    if(!(NODES.flags & NODES_FLAG_STOP))
+    {
+      bDone = FALSE;
+      bGotOne = FALSE;
+      while(!bDone)
+      {
+        strcpy(tempString, "");
+        if(NODES.number > 0)
+        {
+          sprintf(tempString, "%04d", NODES.number);
+          bDone = TRUE;
+        }
+        else
+        {
+          if(NODES.OBStopNumber > 0 && !bGotOne)
+          {
+            sprintf(tempString, "%04d", NODES.OBStopNumber);
+            bGotOne = TRUE;
+          }
+          else
+          {
+            if(NODES.IBStopNumber > 0)
+            { 
+              sprintf(tempString, "%04d", NODES.IBStopNumber);
+            }
+            bDone = TRUE;
+          }
+        }
+        if(strcmp(tempString, "") == 0)
+        {
+          break;
+        }
+        recordID = NODES.recordID;
+        strncpy(NODESKey2.abbrName, tempString, NODES_ABBRNAME_LENGTH);
+        rcode2 = btrieve(B_GETEQUAL, TMS_NODES, &N, &NODESKey2, 2);
+        if(rcode2 != 0)
+        {
+          memcpy(&N, &NODES, sizeof(NODESDef));
+          rcode2 = btrieve(B_GETLAST, TMS_NODES, &NODES, &NODESKey0, 0);
+          newRecordID = AssignRecID(rcode2, NODES.recordID);
+          N.recordID = newRecordID;
+          strncpy(N.abbrName, tempString, NODES_ABBRNAME_LENGTH);
+          strcpy(N.longName, "Stop");
+          strncpy(&N.longName[4], tempString, NODES_ABBRNAME_LENGTH);
+          N.flags |= NODES_FLAG_STOP;
+          N.number = atol(tempString);
+          N.OBStopNumber = NO_RECORD;
+          N.IBStopNumber = NO_RECORD;
+          rcode2 = btrieve(B_INSERT, TMS_NODES, &N, &NODESKey0, 0);
+        }
+        NODESKey0.recordID = recordID;
+        rcode2 = btrieve(B_GETEQUAL, TMS_NODES, &NODES, &NODESKey0, 0);
+      }
+    }
+    rcode2 = btrieve(B_GETNEXT, TMS_NODES, &NODES, &NODESKey0, 0);
+  }
+*/
+//
+//  Onetime fix - set the vehicle type to "1" for Jerusalem Inter-City routes
+//
+/*
+  rcode2 = btrieve(B_GETFIRST, TMS_ROUTES, &ROUTES, &ROUTESKey0, 0);
+  while(rcode2 == 0 &&
+        ROUTES.recordID < 12)
+  {
+    rcode2 = btrieve(B_GETFIRST, TMS_SERVICES, &SERVICES, &SERVICESKey0, 0);
+    while(rcode2 == 0)
+    {
+      TRIPSKey1.ROUTESrecordID = ROUTES.recordID;
+      TRIPSKey1.SERVICESrecordID = SERVICES.recordID;
+      TRIPSKey1.directionIndex = NO_RECORD;
+      TRIPSKey1.tripSequence = NO_RECORD;
+      rcode2 = btrieve(B_GETGREATER, TMS_TRIPS, &TRIPS, &TRIPSKey1, 1);
+      while(rcode2 == 0 &&
+            TRIPS.ROUTESrecordID == ROUTES.recordID &&
+            TRIPS.SERVICESrecordID == SERVICES.recordID)
+      {
+        TRIPS.BUSTYPESrecordID = 1;
+        rcode2 = btrieve(B_UPDATE, TMS_TRIPS, &TRIPS, &TRIPSKey1, 1);
+        rcode2 = btrieve(B_GETNEXT, TMS_TRIPS, &TRIPS, &TRIPSKey1, 1);
+      }
+      rcode2 = btrieve(B_GETNEXT, TMS_SERVICES, &SERVICES, &SERVICESKey0, 0);
+    }
+    rcode2 = btrieve(B_GETNEXT, TMS_ROUTES, &ROUTES, &ROUTESKey0, 0);
+  }
+*/
+//
+//  Onetime fix - Expand connection times from general case
+//                to general case + time-of-day breakdown (Jerusalem)
+//
+//  00:00 - 05:29 -20%
+//  05:30 - 06:29	-18%  
+//  06:30 - 08:59	+30%
+//  09:00 - 12:29	-16%
+//  12:30 - 15:29	-14%
+//  15:30 - 18:29	+30%
+//  18:30 - 23:59	-20%
+//
+/*
+#define NUMRANGES 7
+
+typedef struct RANGEStruct
+{
+  long  fromTime;
+  long  toTime;
+  float adjustment;
+} RANGEDef;
+
+  RANGEDef Ranges[NUMRANGES];
+  long     lastRecordID, thisRecordID;
+  long     thisConnectionTime;
+  CONNECTIONSDef C;
+
+  Ranges[0].fromTime = 0;
+  Ranges[0].toTime = (5 * 3600) + (29 * 60);
+  Ranges[0].adjustment = -20.0;
+
+  Ranges[1].fromTime = (5 * 3600) + (30 * 60);
+  Ranges[1].toTime = (6 * 3600) + (29 * 60);
+  Ranges[1].adjustment = -18.0;
+
+  Ranges[2].fromTime = (6 * 3600) + (30 * 60);
+  Ranges[2].toTime = (8 * 3600) + (59 * 60);
+  Ranges[2].adjustment = 30.0;
+
+  Ranges[3].fromTime = (9 * 3600) + (0 * 60);
+  Ranges[3].toTime = (12 * 3600) + (29 * 60);
+  Ranges[3].adjustment = -16.0;
+
+  Ranges[4].fromTime = (12 * 3600) + (30 * 60);
+  Ranges[4].toTime = (15 * 3600) + (29 * 60);
+  Ranges[4].adjustment = -14.0;
+
+  Ranges[5].fromTime = (15 * 3600) + (30 * 60);
+  Ranges[5].toTime = (18 * 3600) + (29 * 60);
+  Ranges[5].adjustment = 30.0;
+
+  Ranges[6].fromTime = (18 * 3600) + (30 * 60);
+  Ranges[6].toTime = (23 * 3600) + (59 * 60);
+  Ranges[6].adjustment = -20.0;
+
+  rcode2 = btrieve(B_GETLAST, TMS_CONNECTIONS, &CONNECTIONS, &CONNECTIONSKey0, 0);
+  lastRecordID = CONNECTIONS.recordID;
+  rcode2 = btrieve(B_GETFIRST, TMS_CONNECTIONS, &CONNECTIONS, &CONNECTIONSKey0, 0);
+  while(rcode2 == 0)
+  {
+    if(thisRecordID == lastRecordID)
+    {
+      break;
+    }
+    thisRecordID = CONNECTIONS.recordID;
+    if(CONNECTIONS.connectionTime != 0) // Equivalence
+    {
+      thisConnectionTime = CONNECTIONS.connectionTime;
+      for(nI = 0; nI < NUMRANGES; nI++)
+      {
+        rcode2 = btrieve(B_GETLAST, TMS_CONNECTIONS, &C, &CONNECTIONSKey0, 0);
+        CONNECTIONS.recordID = AssignRecID(rcode2, C.recordID);
+        CONNECTIONS.fromTimeOfDay = Ranges[nI].fromTime;
+        CONNECTIONS.toTimeOfDay = Ranges[nI].toTime;
+        CONNECTIONS.connectionTime = thisConnectionTime +
+              (long)((Ranges[nI].adjustment / 100.0) * thisConnectionTime);
+        rcode2 = btrieve(B_INSERT, TMS_CONNECTIONS, &CONNECTIONS, &CONNECTIONSKey0, 0);
+      }
+      CONNECTIONSKey0.recordID = thisRecordID;
+      rcode2 = btrieve(B_GETEQUAL, TMS_CONNECTIONS, &CONNECTIONS, &CONNECTIONSKey0, 0);
+    }
+    rcode2 = btrieve(B_GETNEXT, TMS_CONNECTIONS, &CONNECTIONS, &CONNECTIONSKey0, 0);
+  }
+*/ 
+//
+//  Onetime fix - clear extraboard values from the runs table
+//
+/*
+  rcode2 = btrieve(B_GETFIRST, TMS_RUNS, &RUNS, &RUNSKey0, 0);
+  while(rcode2 == 0)
+  {
+    RUNS.prior.startTime = NO_TIME;
+    RUNS.prior.endTime = NO_TIME;
+    RUNS.after.startTime = NO_TIME;
+    RUNS.after.endTime = NO_TIME;
+    rcode2 = btrieve(B_UPDATE, TMS_RUNS, &RUNS, &RUNSKey0, 0);
+    rcode2 = btrieve(B_GETNEXT, TMS_RUNS, &RUNS, &RUNSKey0, 0);
+  }
+*/
+//
+//  Onetime fix - change all the "&&" to "&" in the NODES.intersection/description fields
+//
+/*
+  char *ptr;
+
+  rcode2 = btrieve(B_GETFIRST, TMS_NODES, &NODES, &NODESKey0, 0);
+  while(rcode2 == 0)
+  {
+    strncpy(tempString, NODES.intersection, NODES_INTERSECTION_LENGTH);
+    trim(tempString, NODES_INTERSECTION_LENGTH);
+    ptr = strstr(tempString, "&&");
+    if(ptr)
+    {
+      strcpy(ptr, (ptr + 1));
+      pad(tempString, NODES_INTERSECTION_LENGTH);
+      strncpy(NODES.intersection, tempString, NODES_INTERSECTION_LENGTH);
+      rcode2 = btrieve(B_UPDATE, TMS_NODES, &NODES, &NODESKey0, 0);
+    }
+    strncpy(tempString, NODES.description, NODES_DESCRIPTION_LENGTH);
+    trim(tempString, NODES_DESCRIPTION_LENGTH);
+    ptr = strstr(tempString, "&&");
+    if(ptr)
+    {
+      strcpy(ptr, (ptr + 1));
+      pad(tempString, NODES_DESCRIPTION_LENGTH);
+      strncpy(NODES.description, tempString, NODES_DESCRIPTION_LENGTH);
+      rcode2 = btrieve(B_UPDATE, TMS_NODES, &NODES, &NODESKey0, 0);
+    }
+    rcode2 = btrieve(B_GETNEXT, TMS_NODES, &NODES, &NODESKey0, 0);
+  }
+*/
+//
+//  Onetime fix - produce a ridiculous output file for Jerusalem
+//
+/*
+  GetConnectionTimeDef GCTData;
+  GenerateTripDef previousGTResults;
+  TRIPSDef previousTRIPS;
+  HFILE hfOutputFile;
+  float distance;
+  long  deadheadTime;
+  long  SERVICErecordIDs[7] = {5, 11, 9, 7, 2, 3, 4};
+  long  DIVISIONSrecordID, prevDIVISIONSrecordID;
+  long  TRIPSrecordID;
+  long  runNumber[2];
+  char  szRouteNumber[ROUTES_NUMBER_LENGTH + 1];
+  char  szDirectionName[DIRECTIONS_LONGNAME_LENGTH + 1];
+  char  outputString[512];
+  BOOL  bGotOne;
+  BOOL  bPullin;
+  int   nM;
+
+  strcpy(tempString, szReportsTempFolder);
+  strcat(tempString, "\\JTMT.txt");
+  hfOutputFile = _lcreat(tempString, 0);
+  if(hfOutputFile == HFILE_ERROR)
+  {
+    LoadString(hInst, ERROR_202, szFormatString, sizeof(szFormatString));
+    sprintf(szarString, szFormatString, tempString);
+    MessageBeep(MB_ICONSTOP);
+    MessageBox(szarString, TMS, MB_ICONSTOP);
+    goto done;
+  }
+
+  for(nI = 0; nI < 7; nI++)
+  {
+    prevDIVISIONSrecordID = NO_RECORD;
+    rcode2 = btrieve(B_GETFIRST, TMS_ROUTES, &ROUTES, &ROUTESKey1, 1);
+    while(rcode2 == 0)
+    {
+      for(nJ = 0; nJ < 2; nJ++)
+      {
+        if(ROUTES.DIRECTIONSrecordID[nJ] == NO_RECORD)
+        {
+          continue;
+        }
+//
+//  Save the route number
+//
+        strncpy(szRouteNumber, ROUTES.number, ROUTES_NUMBER_LENGTH);
+        trim(szRouteNumber, ROUTES_NUMBER_LENGTH);
+//
+//  Save the long direction name
+//
+        DIRECTIONSKey0.recordID = ROUTES.DIRECTIONSrecordID[nJ];
+        btrieve(B_GETEQUAL, TMS_DIRECTIONS, &DIRECTIONS, &DIRECTIONSKey0, 0);
+        strncpy(szDirectionName, DIRECTIONS.longName, DIRECTIONS_LONGNAME_LENGTH);
+        trim(szDirectionName, DIRECTIONS_LONGNAME_LENGTH);
+//
+//  Cycle through the trips
+//
+        TRIPSKey1.ROUTESrecordID = ROUTES.recordID;
+        TRIPSKey1.SERVICESrecordID = SERVICErecordIDs[nI];
+        TRIPSKey1.directionIndex = nJ;
+        TRIPSKey1.tripSequence = NO_TIME;
+        rcode2 = btrieve(B_GETGREATER, TMS_TRIPS, &TRIPS, &TRIPSKey1, 1);
+        while(rcode2 == 0 &&
+              TRIPS.ROUTESrecordID == ROUTES.recordID &&
+              TRIPS.SERVICESrecordID == SERVICErecordIDs[nI] &&
+              TRIPS.directionIndex == nJ)
+        {
+          GenerateTrip(TRIPS.ROUTESrecordID, TRIPS.SERVICESrecordID, TRIPS.directionIndex,
+                TRIPS.PATTERNNAMESrecordID, TRIPS.timeAtMLP, 0, &GTResults);
+          if(ROUTES.COMMENTSrecordID == 1 || ROUTES.COMMENTSrecordID == 6)
+          {
+            DIVISIONSrecordID = 1;
+          }
+          else
+          {
+            DIVISIONSrecordID = 2;
+          }
+//
+//  If the division changed, read in the runs
+//
+          if(DIVISIONSrecordID != prevDIVISIONSrecordID)
+          {
+            TRIPSrecordID = TRIPS.recordID;
+            GetRunRecords(DIVISIONSrecordID, SERVICErecordIDs[nI]);
+            TRIPSKey0.recordID = TRIPSrecordID;
+            btrieve(B_GETEQUAL, TMS_TRIPS, &TRIPS, &TRIPSKey0, 0);
+            btrieve(B_GETPOSITION, TMS_TRIPS, &TRIPS, &TRIPSKey1, 1);
+            btrieve(B_GETDIRECT, TMS_TRIPS, &TRIPS, &TRIPSKey1, 1);
+            prevDIVISIONSrecordID = DIVISIONSrecordID;
+          }
+//
+//  Check on a pull-out
+//
+          if(TRIPS.standard.POGNODESrecordID != NO_RECORD)
+          {
+//
+//  Trip number
+//
+            sprintf(szarString, "%ld\t", TRIPS.tripNumber);
+            strcpy(outputString, szarString);
+//
+//  Spaces
+//
+            strcat(outputString, "\t\t\t\t\t\t\t");
+//
+//  Origin
+//
+            NODESKey0.recordID = TRIPS.standard.POGNODESrecordID;
+            btrieve(B_GETEQUAL, TMS_NODES, &NODES, &NODESKey0, 0);
+            sprintf(szarString, "%ld\t", NODES.number);
+            strcat(outputString, szarString);
+//
+//  Destination
+//
+            NODESKey0.recordID = GTResults.firstNODESrecordID;
+            btrieve(B_GETEQUAL, TMS_NODES, &NODES, &NODESKey0, 0);
+            sprintf(szarString, "%ld\t", NODES.number);
+            strcat(outputString, szarString);
+//
+//  Day
+//
+            sprintf(szarString, "%d\t", nI + 1);
+            strcat(outputString, szarString);
+//
+//  Get the deadhead info
+//
+            GCTData.fromPATTERNNAMESrecordID = TRIPS.PATTERNNAMESrecordID;
+            GCTData.toPATTERNNAMESrecordID = TRIPS.PATTERNNAMESrecordID;
+            GCTData.fromROUTESrecordID = TRIPS.ROUTESrecordID;
+            GCTData.fromSERVICESrecordID = TRIPS.SERVICESrecordID;
+            GCTData.toROUTESrecordID = TRIPS.ROUTESrecordID;
+            GCTData.toSERVICESrecordID = TRIPS.SERVICESrecordID;
+            GCTData.fromNODESrecordID = TRIPS.standard.POGNODESrecordID;
+            GCTData.toNODESrecordID = GTResults.firstNODESrecordID;
+            GCTData.timeOfDay = GTResults.firstNodeTime;
+            deadheadTime = GetConnectionTime(GCT_FLAG_DEADHEADTIME, &GCTData, &distance);
+            distance = (float)fabs((double)distance);
+//
+//  Departure time
+//
+            strcat(outputString, Tchar(GTResults.firstNodeTime - deadheadTime));
+            strcat(outputString, "\t");
+//
+//  End time
+//
+            strcat(outputString, Tchar(GTResults.firstNodeTime));
+            strcat(outputString, "\t");
+//
+//  Block number
+//
+            sprintf(szarString, "%ld\t", TRIPS.standard.blockNumber);
+            strcat(outputString, szarString);
+//
+//  Bus number
+//
+            sprintf(szarString, "%ld\t", TRIPS.standard.blockNumber);
+            strcat(outputString, szarString);
+//
+//  Get the run number(s) on the trip
+//
+            runNumber[0] = 0;
+            runNumber[1] = 0;
+            for(bGotOne = FALSE, nM = 0; nM < m_numRunRecords; nM++)
+            {
+              if(bGotOne && m_pRunRecordData[nM].blockNumber != TRIPS.standard.blockNumber)
+              {
+                break;
+              }
+              if(m_pRunRecordData[nM].startTRIPSrecordID == TRIPS.recordID ||
+                    (m_pRunRecordData[nM].blockNumber == TRIPS.standard.blockNumber &&
+                     GTResults.firstNodeTime >= m_pRunRecordData[nM].startTime &&
+                     GTResults.firstNodeTime <= m_pRunRecordData[nM].endTime))
+              {
+                if(bGotOne)
+                {
+                  runNumber[1] = m_pRunRecordData[nM].runNumber;
+                  break;
+                }
+                else
+                {
+                  runNumber[0] = m_pRunRecordData[nM].runNumber;
+                  runNumber[1] = m_pRunRecordData[nM].runNumber;
+                  bGotOne = TRUE;
+                }
+              }
+            }
+//
+//  Run number(s)
+//
+            sprintf(szarString, "%ld", runNumber[0]);
+            strcat(outputString, szarString);
+//            if(runNumber[0] != runNumber[1] && runNumber[1] != 0)
+//            {
+//              sprintf(szarString, " -> %ld", runNumber[1]);
+//              strcat(outputString, szarString);
+//            }
+//            strcat(outputString, "\t");
+//
+//  Route length
+//
+            sprintf(szarString, "%7.2f", distance);
+            strcat(outputString, szarString);
+            strcat(outputString, "\t");
+//
+//  Travel time
+//
+            strcat(outputString, chhmm(deadheadTime));
+            strcat(outputString, "\r\n");
+//
+//  Write the record
+//
+            _lwrite(hfOutputFile, outputString, strlen(outputString));
+          }
+//
+//  Trip details
+//
+//  Trip number
+//
+          sprintf(szarString, "%ld\t", TRIPS.tripNumber);
+          strcpy(outputString, szarString);
+//
+//  Route ID (Pattern name)
+//
+          PATTERNNAMESKey0.recordID = TRIPS.PATTERNNAMESrecordID;
+          btrieve(B_GETEQUAL, TMS_PATTERNNAMES, &PATTERNNAMES, &PATTERNNAMESKey0, 0);
+          strncpy(szarString, PATTERNNAMES.name, PATTERNNAMES_NAME_LENGTH);
+          trim(szarString, PATTERNNAMES_NAME_LENGTH);
+          strcat(outputString, szarString);
+          strcat(outputString, "\t");
+//
+//  Display (Route number)
+//
+          strcat(outputString, szRouteNumber);
+          strcat(outputString, "\t");
+//
+//  Alternative (last three digits of pattern name)
+//
+          strcat(outputString, &szarString[strlen(szarString) - 3]);
+          strcat(outputString, "\t");
+//
+//  Direction
+//
+          strcat(outputString, szDirectionName);
+          strcat(outputString, "\t");
+//
+//  Service Type
+//
+          PATTERNSKey2.ROUTESrecordID = ROUTES.recordID;
+          PATTERNSKey2.SERVICESrecordID = SERVICErecordIDs[0];
+          PATTERNSKey2.directionIndex = nJ;
+          PATTERNSKey2.PATTERNNAMESrecordID = TRIPS.PATTERNNAMESrecordID;
+          PATTERNSKey2.nodeSequence = NO_RECORD;
+          rcode2 = btrieve(B_GETGREATER, TMS_PATTERNS, &PATTERNS, &PATTERNSKey2, 2);
+          if(PATTERNS.COMMENTSrecordID == 3)
+          {
+            strcat(outputString, "Regular");
+          }
+          else if(PATTERNS.COMMENTSrecordID == 4)
+          {
+            strcat(outputString, "Express");
+          }
+          else if(PATTERNS.COMMENTSrecordID == 5)
+          {
+            strcat(outputString, "Direct");
+          }
+          strcat(outputString, "\t");
+//
+//  Line type
+//
+          if(ROUTES.COMMENTSrecordID == 1)
+          {
+            strcat(outputString, "Urban");
+            DIVISIONSrecordID = 1;
+          }
+          else if(ROUTES.COMMENTSrecordID == 2)
+          {
+            strcat(outputString, "Inter-City");
+            DIVISIONSrecordID = 2;
+          }
+          else if(ROUTES.COMMENTSrecordID == 6)
+          {
+            strcat(outputString, "Regional");
+            DIVISIONSrecordID = 1;
+          }
+          strcat(outputString, "\t");
+//
+//  Bus type
+//
+          if(TRIPS.BUSTYPESrecordID == 1)
+          {
+            strcat(outputString, "Inter-City");
+          }
+          else if(TRIPS.BUSTYPESrecordID == 2)
+          {
+            strcat(outputString, "Urban");
+          }
+          strcat(outputString, "\t");
+//
+//  Origin
+//
+          NODESKey0.recordID = GTResults.firstNODESrecordID;
+          btrieve(B_GETEQUAL, TMS_NODES, &NODES, &NODESKey0, 0);
+          sprintf(szarString, "%ld\t", NODES.number);
+          strcat(outputString, szarString);
+//
+//  Destination
+//
+          NODESKey0.recordID = GTResults.lastNODESrecordID;
+          btrieve(B_GETEQUAL, TMS_NODES, &NODES, &NODESKey0, 0);
+          sprintf(szarString, "%ld\t", NODES.number);
+          strcat(outputString, szarString);
+//
+//  Day
+//
+          sprintf(szarString, "%d\t", nI + 1);
+          strcat(outputString, szarString);
+//
+//  Departure time
+//
+          strcat(outputString, Tchar(GTResults.firstNodeTime));
+          strcat(outputString, "\t");
+//
+//  End time
+//
+          strcat(outputString, Tchar(GTResults.lastNodeTime));
+          strcat(outputString, "\t");
+//
+//  Block number
+//
+          sprintf(szarString, "%ld\t", TRIPS.standard.blockNumber);
+          strcat(outputString, szarString);
+//
+//  Bus number
+//
+          sprintf(szarString, "%ld\t", TRIPS.standard.blockNumber);
+          strcat(outputString, szarString);
+//
+//  Get the run number(s) on the trip
+//
+          runNumber[0] = 0;
+          runNumber[1] = 0;
+          for(bGotOne = FALSE, nM = 0; nM < m_numRunRecords; nM++)
+          {
+            if(bGotOne && m_pRunRecordData[nM].blockNumber != TRIPS.standard.blockNumber)
+            {
+              break;
+            }
+            if(m_pRunRecordData[nM].startTRIPSrecordID == TRIPS.recordID ||
+                  (m_pRunRecordData[nM].blockNumber == TRIPS.standard.blockNumber &&
+                   GTResults.firstNodeTime >= m_pRunRecordData[nM].startTime &&
+                   GTResults.firstNodeTime <= m_pRunRecordData[nM].endTime))
+            {
+              if(bGotOne)
+              {
+                runNumber[1] = m_pRunRecordData[nM].runNumber;
+                break;
+              }
+              else
+              {
+                runNumber[0] = m_pRunRecordData[nM].runNumber;
+                runNumber[1] = m_pRunRecordData[nM].runNumber;
+                bGotOne = TRUE;
+              }
+            }
+          }
+//
+//  Run number(s)
+//
+          sprintf(szarString, "%ld", runNumber[0]);
+          strcat(outputString, szarString);
+//          if(runNumber[0] != runNumber[1] && runNumber[1] != 0)
+//          {
+//            sprintf(szarString, " -> %ld", runNumber[1]);
+//            strcat(outputString, szarString);
+//          }
+//          strcat(outputString, "\t");
+//
+//  Route length
+//
+          sprintf(szarString, "%7.2f", GTResults.tripDistance);
+          strcat(outputString, szarString);
+          strcat(outputString, "\t");
+//
+//  Travel time
+//
+          strcat(outputString, chhmm(GTResults.lastNodeTime - GTResults.firstNodeTime));
+          strcat(outputString, "\r\n");
+//
+//  Write the record
+//
+          _lwrite(hfOutputFile, outputString, strlen(outputString));
+//
+//  Check on a pull-in
+//
+          bPullin = (TRIPS.standard.PIGNODESrecordID != NO_RECORD);
+          if(bPullin)
+          {
+//
+//  Trip number
+//
+            sprintf(szarString, "%ld\t", TRIPS.tripNumber);
+            strcpy(outputString, szarString);
+//
+//  Spaces
+//
+            strcat(outputString, "\t\t\t\t\t\t\t");
+//
+//  Origin
+//
+            NODESKey0.recordID = GTResults.lastNODESrecordID;
+            btrieve(B_GETEQUAL, TMS_NODES, &NODES, &NODESKey0, 0);
+            sprintf(szarString, "%ld\t", NODES.number);
+            strcat(outputString, szarString);
+//
+//  Destination
+//
+            NODESKey0.recordID = TRIPS.standard.PIGNODESrecordID;
+            btrieve(B_GETEQUAL, TMS_NODES, &NODES, &NODESKey0, 0);
+            sprintf(szarString, "%ld\t", NODES.number);
+            strcat(outputString, szarString);
+//
+//  Day
+//
+            sprintf(szarString, "%d\t", nI + 1);
+            strcat(outputString, szarString);
+//
+//  Get the deadhead info
+//
+            GCTData.fromPATTERNNAMESrecordID = TRIPS.PATTERNNAMESrecordID;
+            GCTData.toPATTERNNAMESrecordID = TRIPS.PATTERNNAMESrecordID;
+            GCTData.fromROUTESrecordID = TRIPS.ROUTESrecordID;
+            GCTData.fromSERVICESrecordID = TRIPS.SERVICESrecordID;
+            GCTData.toROUTESrecordID = TRIPS.ROUTESrecordID;
+            GCTData.toSERVICESrecordID = TRIPS.SERVICESrecordID;
+            GCTData.fromNODESrecordID = GTResults.lastNODESrecordID;
+            GCTData.toNODESrecordID = TRIPS.standard.PIGNODESrecordID;
+            GCTData.timeOfDay = GTResults.lastNodeTime;
+            deadheadTime = GetConnectionTime(GCT_FLAG_DEADHEADTIME, &GCTData, &distance);
+            distance = (float)fabs((double)distance);
+//
+//  Departure time
+//
+            strcat(outputString, Tchar(GTResults.lastNodeTime));
+            strcat(outputString, "\t");
+//
+//  End time
+//
+            strcat(outputString, Tchar(GTResults.lastNodeTime + deadheadTime));
+            strcat(outputString, "\t");
+//
+//  Block number
+//
+            sprintf(szarString, "%ld\t", TRIPS.standard.blockNumber);
+            strcat(outputString, szarString);
+//
+//  Bus number
+//
+            sprintf(szarString, "%ld\t", TRIPS.standard.blockNumber);
+            strcat(outputString, szarString);
+//
+//  Get the run number(s) on the trip
+//
+            runNumber[0] = 0;
+            runNumber[1] = 0;
+            for(bGotOne = FALSE, nM = 0; nM < m_numRunRecords; nM++)
+            {
+              if(bGotOne && m_pRunRecordData[nM].blockNumber != TRIPS.standard.blockNumber)
+              {
+                break;
+              }
+              if(m_pRunRecordData[nM].startTRIPSrecordID == TRIPS.recordID ||
+                    (m_pRunRecordData[nM].blockNumber == TRIPS.standard.blockNumber &&
+                     GTResults.firstNodeTime >= m_pRunRecordData[nM].startTime &&
+                     GTResults.firstNodeTime <= m_pRunRecordData[nM].endTime))
+              {
+                if(bGotOne)
+                {
+                  runNumber[1] = m_pRunRecordData[nM].runNumber;
+                  break;
+                }
+                else
+                {
+                  runNumber[0] = m_pRunRecordData[nM].runNumber;
+                  runNumber[1] = m_pRunRecordData[nM].runNumber;
+                  bGotOne = TRUE;
+                }
+              }
+            }
+//
+//  Run number(s)
+//
+            sprintf(szarString, "%ld", runNumber[0]);
+            strcat(outputString, szarString);
+//            if(runNumber[0] != runNumber[1] && runNumber[1] != 0)
+//            {
+//              sprintf(szarString, " -> %ld", runNumber[1]);
+//              strcat(outputString, szarString);
+//            }
+//            strcat(outputString, "\t");
+//
+//  Route length
+//
+            sprintf(szarString, "%7.2f", distance);
+            strcat(outputString, szarString);
+            strcat(outputString, "\t");
+//
+//  Travel time
+//
+            strcat(outputString, chhmm(deadheadTime));
+            strcat(outputString, "\r\n");
+//
+//  Write the record
+//
+            _lwrite(hfOutputFile, outputString, strlen(outputString));
+          }
+//
+//  Not a pullin on the trip - check the block for an interline deadhead
+//
+          if(!bPullin)
+          {
+            previousTRIPS = TRIPS;
+            previousGTResults = GTResults;
+            btrieve(B_GETPOSITION, TMS_TRIPS, &TRIPS, &TRIPSKey2, 2);
+            btrieve(B_GETDIRECT, TMS_TRIPS, &TRIPS, &TRIPSKey2, 2);
+            rcode2 = btrieve(B_GETNEXT, TMS_TRIPS, &TRIPS, &TRIPSKey2, 2);
+            if(rcode2 == 0  &&
+                  TRIPS.standard.RGRPROUTESrecordID == previousTRIPS.standard.RGRPROUTESrecordID &&
+                  TRIPS.standard.SGRPSERVICESrecordID == SERVICErecordIDs[nI] &&
+                  TRIPS.standard.blockNumber == previousTRIPS.standard.blockNumber)
+            {
+              GenerateTrip(TRIPS.ROUTESrecordID, TRIPS.SERVICESrecordID, TRIPS.directionIndex,
+                    TRIPS.PATTERNNAMESrecordID, TRIPS.timeAtMLP, 0, &GTResults);
+              if(previousGTResults.lastNODESrecordID != GTResults.firstNODESrecordID &&
+                    !NodesEquivalent(previousGTResults.lastNODESrecordID, GTResults.firstNODESrecordID, &tempLong))
+              {
+//
+//  Trip number
+//
+                sprintf(szarString, "%ld\t", previousTRIPS.tripNumber);
+                strcpy(outputString, szarString);
+//
+//  Spaces
+//
+                strcat(outputString, "\t\t\t\t\t\t\t");
+//
+//  Origin
+//
+                NODESKey0.recordID = previousGTResults.lastNODESrecordID;
+                btrieve(B_GETEQUAL, TMS_NODES, &NODES, &NODESKey0, 0);
+                sprintf(szarString, "%ld\t", NODES.number);
+                strcat(outputString, szarString);
+//
+//  Destination
+//
+                NODESKey0.recordID = GTResults.firstNODESrecordID;
+                btrieve(B_GETEQUAL, TMS_NODES, &NODES, &NODESKey0, 0);
+                sprintf(szarString, "%ld\t", NODES.number);
+                strcat(outputString, szarString);
+//
+//  Day
+//
+                sprintf(szarString, "%d\t", nI + 1);
+                strcat(outputString, szarString);
+//
+//  Get the deadhead info
+//
+                GCTData.fromPATTERNNAMESrecordID = TRIPS.PATTERNNAMESrecordID;
+                GCTData.toPATTERNNAMESrecordID = TRIPS.PATTERNNAMESrecordID;
+                GCTData.fromROUTESrecordID = TRIPS.ROUTESrecordID;
+                GCTData.fromSERVICESrecordID = TRIPS.SERVICESrecordID;
+                GCTData.toROUTESrecordID = TRIPS.ROUTESrecordID;
+                GCTData.toSERVICESrecordID = TRIPS.SERVICESrecordID;
+                GCTData.fromNODESrecordID = previousGTResults.lastNODESrecordID;
+                GCTData.toNODESrecordID = GTResults.firstNODESrecordID;;
+                GCTData.timeOfDay = previousGTResults.lastNodeTime;
+                deadheadTime = GetConnectionTime(GCT_FLAG_DEADHEADTIME, &GCTData, &distance);
+                distance = (float)fabs((double)distance);
+//
+//  Departure time
+//
+                strcat(outputString, Tchar(previousGTResults.lastNodeTime));
+                strcat(outputString, "\t");
+//
+//  End time
+//
+                strcat(outputString, Tchar(previousGTResults.lastNodeTime + deadheadTime));
+                strcat(outputString, "\t");
+//
+//  Block number
+//
+                sprintf(szarString, "%ld\t", TRIPS.standard.blockNumber);
+                strcat(outputString, szarString);
+//
+//  Bus number
+//
+                sprintf(szarString, "%ld\t", TRIPS.standard.blockNumber);
+                strcat(outputString, szarString);
+//
+//  Get the run number(s) on the trip
+//
+                runNumber[0] = 0;
+                runNumber[1] = 0;
+                for(bGotOne = FALSE, nM = 0; nM < m_numRunRecords; nM++)
+                {
+                  if(bGotOne && m_pRunRecordData[nM].blockNumber != TRIPS.standard.blockNumber)
+                  {
+                    break;
+                  }
+                  if(m_pRunRecordData[nM].startTRIPSrecordID == TRIPS.recordID ||
+                        (m_pRunRecordData[nM].blockNumber == TRIPS.standard.blockNumber &&
+                         GTResults.firstNodeTime >= m_pRunRecordData[nM].startTime &&
+                         GTResults.firstNodeTime <= m_pRunRecordData[nM].endTime))
+                  {
+                    if(bGotOne)
+                    {
+                      runNumber[1] = m_pRunRecordData[nM].runNumber;
+                      break;
+                    }
+                    else
+                    {
+                      runNumber[0] = m_pRunRecordData[nM].runNumber;
+                      runNumber[1] = m_pRunRecordData[nM].runNumber;
+                      bGotOne = TRUE;
+                    }
+                  }
+                }
+//
+//  Run number(s)
+//
+                sprintf(szarString, "%ld", runNumber[0]);
+                strcat(outputString, szarString);
+//                if(runNumber[0] != runNumber[1] && runNumber[1] != 0)
+//                {
+//                  sprintf(szarString, " -> %ld", runNumber[1]);
+//                  strcat(outputString, szarString);
+//                }
+//                strcat(outputString, "\t");
+//
+//  Route length
+//
+                sprintf(szarString, "%7.2f", distance);
+                strcat(outputString, szarString);
+                strcat(outputString, "\t");
+//
+//  Travel time
+//
+                strcat(outputString, chhmm(deadheadTime));
+                strcat(outputString, "\r\n");
+//
+//  Write the record
+//
+                _lwrite(hfOutputFile, outputString, strlen(outputString));
+              }  // different nodes
+            }  // rcode2
+//
+//  And reposition
+//
+            TRIPSKey0.recordID = previousTRIPS.recordID;
+            btrieve(B_GETEQUAL, TMS_TRIPS, &TRIPS, &TRIPSKey0, 0);
+            btrieve(B_GETPOSITION, TMS_TRIPS, &TRIPS, &TRIPSKey1, 1);
+            btrieve(B_GETDIRECT, TMS_TRIPS, &TRIPS, &TRIPSKey1, 1);
+          }  //  not a pullin
+          rcode2 = btrieve(B_GETNEXT, TMS_TRIPS, &TRIPS, &TRIPSKey1, 1);
+        }  // on TRIPS
+      }  // nJ 
+//
+//  Get the next route
+//
+      rcode2 = btrieve(B_GETNEXT, TMS_ROUTES, &ROUTES, &ROUTESKey1, 1);
+    }  // on ROUTES
+  }  // nI
+  done:
+    _lclose(hfOutputFile);
+*/
+//
+//  Onetime fix - compare and update NODES.B60 entries and the stop file from Connexionz
+//
+//  Open the text file
+//
+/*
+  FILE *fpi, *fpo;
+  long stopNumber;
+  char szStopNumber[NODES_ABBRNAME_LENGTH + 1];
+  char outputString[256];
+  char szAddress[NODES_INTERSECTION_LENGTH + 1];
+  long platformNumber;
+  float latitude, longitude;
+  BOOL bUpdate;
+
+  fpi = fopen("Updates.TXT", "r");
+  if(fpi == NULL)
+  {
+    MessageBox("Failed to open Updates.TXT", TMS, MB_OK);
+  }
+  else
+  {
+    fpo = fopen("Results.txt", "w");
+    if(fpo == NULL)
+    {
+      MessageBox("Failed to open Results.txt", TMS, MB_OK);
+    }
+    else
+    {
+      while(fgets(szarString, sizeof(szarString), fpi))
+      {
+//
+//  Stop number
+//
+        strcpy(tempString, strtok(szarString, "\t"));
+        stopNumber = atol(tempString);
+        sprintf(szStopNumber, "%04ld", stopNumber);
+//
+//  Status
+//
+        sprintf(outputString, "%s:\r\n", szStopNumber);
+        fputs(outputString, fpo);
+//
+//  Address
+//
+        strcpy(szAddress, strtok(NULL, "\t"));
+//
+//  Platform number
+//
+        strcpy(tempString, strtok(NULL, "\t"));
+        platformNumber = atol(tempString);
+//
+//  Latitude
+//
+        strcpy(tempString, strtok(NULL, "\t"));
+        latitude = (float)atof(tempString);
+//
+//  Longitude
+//
+        strcpy(tempString, strtok(NULL, "\t\n"));
+        longitude = (float)atof(tempString);
+//
+//  Look it up
+//
+        strncpy(NODESKey2.abbrName, szStopNumber, NODES_ABBRNAME_LENGTH);
+        rcode2 = btrieve(B_GETEQUAL, TMS_NODES, &NODES, &NODESKey2, 2);
+//
+//  Existing node
+//
+        if(rcode2 == 0)
+        {
+          bUpdate = FALSE;
+//
+//  Address
+//
+          strncpy(tempString, NODES.intersection, NODES_INTERSECTION_LENGTH);
+          trim(tempString, NODES_INTERSECTION_LENGTH);
+          if(strcmp(tempString, szAddress) != 0)
+          {
+            sprintf(outputString, "  Changed address/description to '%s'\r\n", szAddress);
+            fputs(outputString, fpo);
+            strncpy(NODES.intersection, tempString, NODES_INTERSECTION_LENGTH);
+            strncpy(NODES.description, tempString, NODES_DESCRIPTION_LENGTH);
+            bUpdate = TRUE;
+          }
+//
+//  Node number
+//
+          if(NODES.number != platformNumber)
+          {
+            sprintf(outputString, "  Changed platform number from %ld to %ld\r\n", NODES.number, platformNumber);
+            fputs(outputString, fpo);
+            NODES.number = platformNumber;
+            bUpdate = TRUE;
+          }
+//
+//  Latitude/Long
+//
+          if(NODES.latitude != latitude || NODES.longitude != longitude)
+          {
+            sprintf(outputString, "  Changed lat/long from %f,%f to %f,%f\r\n", 
+                  NODES.latitude, NODES.longitude, latitude, longitude);
+            fputs(outputString, fpo);
+            NODES.latitude = latitude;
+            NODES.longitude = longitude;
+            bUpdate = TRUE;
+          }
+//
+//  Update?
+//
+          if(bUpdate)
+          {
+            rcode2 = btrieve(B_UPDATE, TMS_NODES, &NODES, &NODESKey2, 2);
+          }
+        }
+//
+//  New node
+//
+        else
+        {
+          rcode2 = btrieve(B_GETLAST, TMS_NODES, &NODES, &NODESKey0, 0);
+          NODES.recordID = AssignRecID(rcode2, NODES.recordID);
+
+          sprintf(outputString, "  New stop\r\n", szAddress);
+          fputs(outputString, fpo);
+          sprintf(outputString, "  Address/description:'%s'\r\n", szAddress);
+          fputs(outputString, fpo);
+          sprintf(outputString, "  Platform number: %d\r\n", platformNumber);
+          fputs(outputString, fpo);
+          sprintf(outputString, "  Lat/Long: %f,%f\r\n", latitude, longitude);
+          fputs(outputString, fpo);
+//
+//  Set up the record
+//
+          NODES.COMMENTSrecordID = NO_RECORD;
+          NODES.JURISDICTIONSrecordID = NO_RECORD;
+          strncpy(NODES.abbrName, szStopNumber, NODES_ABBRNAME_LENGTH);
+          sprintf(tempString, "Stop%s", szStopNumber);
+          strncpy(NODES.longName, tempString, NODES_LONGNAME_LENGTH);
+          strncpy(NODES.intersection, szAddress, NODES_INTERSECTION_LENGTH);
+          strncpy(NODES.description, szAddress, NODES_INTERSECTION_LENGTH);
+          memset(&NODES.reliefLabels, 0x00, NODES_RELIEFLABELS_LENGTH);
+          NODES.latitude = latitude;
+          NODES.longitude = longitude;
+          NODES.number = platformNumber;
+          memset(&NODES.mapCodes, 0x00, NODES_MAPCODES_LENGTH);
+          NODES.capacity = NO_RECORD;
+          NODES.OBStopNumber = NO_RECORD;
+          NODES.IBStopNumber = NO_RECORD;
+          memset(&NODES.AVLStopName, 0x00, NODES_AVLSTOPNAME_LENGTH);
+          memset(&NODES.reserved, 0x00, NODES_RESERVED_LENGTH);
+          NODES.stopFlags = 0;
+          NODES.flags = NODES_FLAG_STOP;
+          rcode2 = btrieve(B_INSERT, TMS_NODES, &NODES, &NODESKey0, 0);
+        }
+      }
+    }
+  }
+  fclose(fpi);
+  fclose(fpo);
+*/
+//
 //  And leave
 //
   SetCursor(hSaveCursor);	

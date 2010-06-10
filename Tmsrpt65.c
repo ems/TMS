@@ -38,6 +38,14 @@ typedef struct TMSRPT65PATStruct
   long flags[200];
 } TMSRPT65PATDef;
   
+typedef struct NODESUBSETStruct
+{
+  long recordID;
+  long number;
+  long OBStopNumber;
+  long IBStopNumber;
+  long flags;
+} NODESUBSETDef;
 //
 //  Web-Based Trip Planner Download
 //
@@ -47,6 +55,7 @@ BOOL FAR TMSRPT65(TMSRPTPassedDataDef *pPassedData)
 {
   GenerateTripDef GTResults;
   TMSRPT65PATDef  PAT[20];
+  NODESUBSETDef  *pNODESUBSET;
   double  Long, Lat;
   double  prevLon, prevLat;
   double  distanceToHere;
@@ -59,12 +68,15 @@ BOOL FAR TMSRPT65(TMSRPTPassedDataDef *pPassedData)
   BOOL  bFinishedOK;
   BOOL  bFound;
   BOOL  bFirst;
+  BOOL  bIncludeSchool;
   long  prevPattern;
   long  totalCycles;
   long  year, month, day;
   long  timeAtStop;
   long  lastTripNumber;
   long  maxTrips;
+  long  recordID;
+  long  stopNumber;
   char  szServiceName[SERVICES_NAME_LENGTH + 1];
   char  szRouteNumber[ROUTES_NUMBER_LENGTH + 1];
   char  szRouteName[ROUTES_NAME_LENGTH + 1];
@@ -78,6 +90,7 @@ BOOL FAR TMSRPT65(TMSRPTPassedDataDef *pPassedData)
   int   nI;
   int   nJ;
   int   nK;
+  int   nL;
   int   rcode2;
   int   maxRoutes;
   int   maxServices;
@@ -85,6 +98,7 @@ BOOL FAR TMSRPT65(TMSRPTPassedDataDef *pPassedData)
   int   numServices;
   int   numPatterns;
   int   tripIndex;
+  int   numNODESUBSET;
 
   bFinishedOK = FALSE;
 
@@ -175,6 +189,12 @@ BOOL FAR TMSRPT65(TMSRPTPassedDataDef *pPassedData)
     lastTripNumber = nI;
   }
 //
+//  See if he wants for include school routes
+//
+  LoadString(hInst, TEXT_275, tempString, sizeof(tempString));
+  MessageBeep(MB_ICONQUESTION);
+  bIncludeSchool = (MessageBox(NULL, tempString, TMS, MB_ICONQUESTION | MB_YESNO) == IDYES);
+//
 //  Get the maximum number of routes
 //
   rcode2 = btrieve(B_STAT, TMS_ROUTES, &BSTAT, dummy, 0);
@@ -184,6 +204,33 @@ BOOL FAR TMSRPT65(TMSRPTPassedDataDef *pPassedData)
 //
   rcode2 = btrieve(B_STAT, TMS_SERVICES, &BSTAT, dummy, 0);
   maxServices = rcode2 == 0 ? BSTAT.numRecords : 0;
+//
+//  Node allocation
+//
+//  Get the number of nodes in the table
+//
+  rcode2 = btrieve(B_STAT, TMS_NODES, &BSTAT, dummy, 0);
+  numNODESUBSET = BSTAT.numRecords;
+  pNODESUBSET = (NODESUBSETDef *)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, sizeof(NODESUBSETDef) * numNODESUBSET); 
+  if(pNODESUBSET == NULL)
+  {
+    AllocationError(__FILE__, __LINE__, FALSE);
+    SendMessage(hWndMain, WM_COMMAND, MAKEWPARAM(IDCANCEL, 0), (LPARAM)0);
+    goto done;
+  }
+
+  rcode2 = btrieve(B_GETFIRST, TMS_NODES, &NODES, &NODESKey0, 0);
+  nI = 0;
+  while(rcode2 == 0)
+  {
+    pNODESUBSET[nI].recordID = NODES.recordID;
+    pNODESUBSET[nI].number = NODES.number;
+    pNODESUBSET[nI].OBStopNumber = NODES.OBStopNumber;
+    pNODESUBSET[nI].IBStopNumber = NODES.IBStopNumber;
+    pNODESUBSET[nI].flags = NODES.flags;
+    nI++;
+    rcode2 = btrieve(B_GETNEXT, TMS_NODES, &NODES, &NODESKey0, 0);
+  }
 //
 //  ======================
 //  Nodes File - Nodes.txt
@@ -564,49 +611,53 @@ BOOL FAR TMSRPT65(TMSRPTPassedDataDef *pPassedData)
     }
     if(!(ROUTES.flags & ROUTES_FLAG_EMPSHUTTLE))
     {
-      strncpy(tempString, ROUTES.number, ROUTES_NUMBER_LENGTH);
-      trim(tempString, ROUTES_NUMBER_LENGTH);
-      strcat(tempString, " - ");
-      strncpy(szarString, ROUTES.name, ROUTES_NAME_LENGTH);
-      trim(szarString, ROUTES_NAME_LENGTH);
-      strcat(tempString, szarString);
+      if(((ROUTES.flags & ROUTES_FLAG_SCHOOL) && bIncludeSchool) ||
+            (!(ROUTES.flags & ROUTES_FLAG_SCHOOL)))
+      {
+        strncpy(tempString, ROUTES.number, ROUTES_NUMBER_LENGTH);
+        trim(tempString, ROUTES_NUMBER_LENGTH);
+        strcat(tempString, " - ");
+        strncpy(szarString, ROUTES.name, ROUTES_NAME_LENGTH);
+        trim(szarString, ROUTES_NAME_LENGTH);
+        strcat(tempString, szarString);
 //
 //  Cycle through the services
 //
-      rcode2 = btrieve(B_GETFIRST, TMS_SERVICES, &SERVICES, &SERVICESKey0, 0);
-      while(rcode2 == 0)
-      {
+        rcode2 = btrieve(B_GETFIRST, TMS_SERVICES, &SERVICES, &SERVICESKey0, 0);
+        while(rcode2 == 0)
+        {
 //
 //  Cycle through the directions
 //
-        for(nI = 0; nI < 2; nI++)
-        {
-          if(ROUTES.DIRECTIONSrecordID[nI] == NO_RECORD)
+          for(nI = 0; nI < 2; nI++)
           {
-            continue;
-          }
+            if(ROUTES.DIRECTIONSrecordID[nI] == NO_RECORD)
+            {
+              continue;
+            }
 //
 //  A pattern on this route/ser/dir has to exist
 //
-          PATTERNSKey2.ROUTESrecordID = ROUTES.recordID;
-          PATTERNSKey2.SERVICESrecordID = SERVICES.recordID;
-          PATTERNSKey2.directionIndex = nI;
-          PATTERNSKey2.PATTERNNAMESrecordID = NO_RECORD;
-          PATTERNSKey2.nodeSequence = NO_RECORD;
-          rcode2 = btrieve(B_GETGREATER, TMS_PATTERNS, &PATTERNS, &PATTERNSKey2, 2);
-          if(rcode2 == 0 &&
-                PATTERNS.ROUTESrecordID == ROUTES.recordID &&
-                PATTERNS.SERVICESrecordID == SERVICES.recordID &&
-                PATTERNS.directionIndex == nI)
-          {
-            sprintf(szOutputString, "%8ld\t%8ld\t%8ld\t%s\r\n",
-                  ROUTES.recordID, SERVICES.recordID, ROUTES.DIRECTIONSrecordID[nI], tempString);
-            _lwrite(hfOutputFile, szOutputString, strlen(szOutputString));
-          }
-        }  // nI
-        rcode2 = btrieve(B_GETNEXT, TMS_SERVICES, &SERVICES, &SERVICESKey0, 0);
-      }
-    }
+            PATTERNSKey2.ROUTESrecordID = ROUTES.recordID;
+            PATTERNSKey2.SERVICESrecordID = SERVICES.recordID;
+            PATTERNSKey2.directionIndex = nI;
+            PATTERNSKey2.PATTERNNAMESrecordID = NO_RECORD;
+            PATTERNSKey2.nodeSequence = NO_RECORD;
+            rcode2 = btrieve(B_GETGREATER, TMS_PATTERNS, &PATTERNS, &PATTERNSKey2, 2);
+            if(rcode2 == 0 &&
+                  PATTERNS.ROUTESrecordID == ROUTES.recordID &&
+                  PATTERNS.SERVICESrecordID == SERVICES.recordID &&
+                  PATTERNS.directionIndex == nI)
+            {
+              sprintf(szOutputString, "%8ld\t%8ld\t%8ld\t%s\r\n",
+                    ROUTES.recordID, SERVICES.recordID, ROUTES.DIRECTIONSrecordID[nI], tempString);
+              _lwrite(hfOutputFile, szOutputString, strlen(szOutputString));
+            }
+          }  // nI
+          rcode2 = btrieve(B_GETNEXT, TMS_SERVICES, &SERVICES, &SERVICESKey0, 0);
+        }  // while on services
+      }  // school/no school
+    }  //  shuttle/not a shuttle
     numRoutes++;
     rcode2 = btrieve(B_GETNEXT, TMS_ROUTES, &ROUTES, &ROUTESKey0, 0);
   }
@@ -668,6 +719,10 @@ BOOL FAR TMSRPT65(TMSRPTPassedDataDef *pPassedData)
       }
       btrieve((nJ == 0 ? B_GETFIRST : B_GETNEXT), TMS_ROUTES, &ROUTES, &ROUTESKey0, 0);
       if((ROUTES.flags & ROUTES_FLAG_EMPSHUTTLE))
+      {
+        continue;
+      }
+      if((ROUTES.flags & ROUTES_FLAG_SCHOOL) && !bIncludeSchool)
       {
         continue;
       }
@@ -749,113 +804,163 @@ BOOL FAR TMSRPT65(TMSRPTPassedDataDef *pPassedData)
             goto done;
           }
 //
+//  Kludge - Don't unload trips marked as school-day only
+//           when not unloading school trips
+//
+//          if(!(TRIPS.COMMENTSrecordID == 4 && !bIncludeSchool))
+//          {
+//
 //  Generate the trip
 //
-          GenerateTrip(TRIPS.ROUTESrecordID, TRIPS.SERVICESrecordID,
-                TRIPS.directionIndex, TRIPS.PATTERNNAMESrecordID,
-                TRIPS.timeAtMLP, GENERATETRIP_FLAG_DISPLAYERRORS, &GTResults);
+            GenerateTrip(TRIPS.ROUTESrecordID, TRIPS.SERVICESrecordID,
+                  TRIPS.directionIndex, TRIPS.PATTERNNAMESrecordID,
+                  TRIPS.timeAtMLP, GENERATETRIP_FLAG_DISPLAYERRORS, &GTResults);
 //
 //  Go through the pattern twice
 //
 //  Pass 1 - Determine distances at each timepoint
 //
-          PATTERNSKey2.ROUTESrecordID = ROUTES.recordID;
-          PATTERNSKey2.SERVICESrecordID = SERVICES.recordID;
-          PATTERNSKey2.directionIndex = nK;
-          PATTERNSKey2.PATTERNNAMESrecordID = TRIPS.PATTERNNAMESrecordID;
-          PATTERNSKey2.nodeSequence = NO_RECORD;
-          rcode2 = btrieve(B_GETGREATER, TMS_PATTERNS, &PATTERNS, &PATTERNSKey2, 2);
-          tripIndex = 0;
-          distanceToHere = 0.0;
-          while(rcode2 == 0 &&
-                PATTERNS.ROUTESrecordID == ROUTES.recordID &&
-                PATTERNS.SERVICESrecordID == SERVICES.recordID &&
-                PATTERNS.directionIndex == nK &&
-                PATTERNS.PATTERNNAMESrecordID == TRIPS.PATTERNNAMESrecordID)
-          {
-            NODESKey0.recordID = PATTERNS.NODESrecordID;
-            rcode2 = btrieve(B_GETEQUAL, TMS_NODES, &NODES, &NODESKey0, 0);
-            if(tripIndex == 0)
+            if(TRIPS.tripNumber == 294)
             {
-              distanceToHere = 0;
+              tripIndex = 0;
             }
-            else
+            PATTERNSKey2.ROUTESrecordID = ROUTES.recordID;
+            PATTERNSKey2.SERVICESrecordID = SERVICES.recordID;
+            PATTERNSKey2.directionIndex = nK;
+            PATTERNSKey2.PATTERNNAMESrecordID = TRIPS.PATTERNNAMESrecordID;
+            PATTERNSKey2.nodeSequence = NO_RECORD;
+            rcode2 = btrieve(B_GETGREATER, TMS_PATTERNS, &PATTERNS, &PATTERNSKey2, 2);
+            tripIndex = 0;
+            distanceToHere = 0.0;
+            while(rcode2 == 0 &&
+                  PATTERNS.ROUTESrecordID == ROUTES.recordID &&
+                  PATTERNS.SERVICESrecordID == SERVICES.recordID &&
+                  PATTERNS.directionIndex == nK &&
+                  PATTERNS.PATTERNNAMESrecordID == TRIPS.PATTERNNAMESrecordID)
             {
-              distanceToHere += (float)GreatCircleDistance(prevLon, prevLat, NODES.longitude, NODES.latitude);
-            }
-            if(PATTERNS.flags & PATTERNS_FLAG_BUSSTOP)
-            {
-            }
-            else
-            {
-              tripDistances[tripIndex] = distanceToHere;
-              tripIndex++;
-            }
-            prevLat = NODES.latitude;
-            prevLon = NODES.longitude;
-            rcode2 = btrieve(B_GETNEXT, TMS_PATTERNS, &PATTERNS, &PATTERNSKey2, 2);
-          }
-//
-//  Pass 2 - Determine time interpolations
-//
-          PATTERNSKey2.ROUTESrecordID = ROUTES.recordID;
-          PATTERNSKey2.SERVICESrecordID = SERVICES.recordID;
-          PATTERNSKey2.directionIndex = nK;
-          PATTERNSKey2.PATTERNNAMESrecordID = TRIPS.PATTERNNAMESrecordID;
-          PATTERNSKey2.nodeSequence = NO_RECORD;
-          rcode2 = btrieve(B_GETGREATER, TMS_PATTERNS, &PATTERNS, &PATTERNSKey2, 2);
-          tripIndex = 0;
-          bFirst = TRUE;
-          while(rcode2 == 0 &&
-                PATTERNS.ROUTESrecordID == ROUTES.recordID &&
-                PATTERNS.SERVICESrecordID == SERVICES.recordID &&
-                PATTERNS.directionIndex == nK &&
-                PATTERNS.PATTERNNAMESrecordID == TRIPS.PATTERNNAMESrecordID)
-          {
-            NODESKey0.recordID = PATTERNS.NODESrecordID;
-            rcode2 = btrieve(B_GETEQUAL, TMS_NODES, &NODES, &NODESKey0, 0);
-            if(NODES.flags & NODES_FLAG_STOP)
-            {
-              timeAtStop = 0;
-              if(GTResults.tripDistance == 0)
+              NODESKey0.recordID = PATTERNS.NODESrecordID;
+              rcode2 = btrieve(B_GETEQUAL, TMS_NODES, &NODES, &NODESKey0, 0);
+              if(tripIndex == 0)
               {
-                timeAtStop = GTResults.tripTimes[tripIndex - 1];
+                distanceToHere = 0;
               }
               else
               {
                 distanceToHere += (float)GreatCircleDistance(prevLon, prevLat, NODES.longitude, NODES.latitude);
-                timeAtStop = (long)((GTResults.tripTimes[tripIndex] - GTResults.tripTimes[tripIndex - 1]) *
-                      (distanceToHere / (tripDistances[tripIndex] - tripDistances[tripIndex - 1])));
-                timeAtStop += (GTResults.tripTimes[tripIndex - 1]);
               }
+              if(NODES.flags & NODES_FLAG_STOP)
+//              if(PATTERNS.flags & PATTERNS_FLAG_BUSSTOP)
+              {
+              }
+              else
+              {
+                tripDistances[tripIndex] = distanceToHere;
+                tripIndex++;
+              }
+              prevLat = NODES.latitude;
+              prevLon = NODES.longitude;
+              rcode2 = btrieve(B_GETNEXT, TMS_PATTERNS, &PATTERNS, &PATTERNSKey2, 2);
             }
-            else
+//
+//  Pass 2 - Determine time interpolations
+//
+            PATTERNSKey2.ROUTESrecordID = ROUTES.recordID;
+            PATTERNSKey2.SERVICESrecordID = SERVICES.recordID;
+            PATTERNSKey2.directionIndex = nK;
+            PATTERNSKey2.PATTERNNAMESrecordID = TRIPS.PATTERNNAMESrecordID;
+            PATTERNSKey2.nodeSequence = NO_RECORD;
+            rcode2 = btrieve(B_GETGREATER, TMS_PATTERNS, &PATTERNS, &PATTERNSKey2, 2);
+            tripIndex = 0;
+            bFirst = TRUE;
+            while(rcode2 == 0 &&
+                  PATTERNS.ROUTESrecordID == ROUTES.recordID &&
+                  PATTERNS.SERVICESrecordID == SERVICES.recordID &&
+                  PATTERNS.directionIndex == nK &&
+                  PATTERNS.PATTERNNAMESrecordID == TRIPS.PATTERNNAMESrecordID)
             {
-              timeAtStop = GTResults.tripTimes[tripIndex];
-              tripIndex++;  
-              distanceToHere = 0.0;
-            }
-            if(bFirst)
-            {
-              bFirst = FALSE;
-            }
-            else
-            {
-              sprintf(szOutputString, "%ld\t%ld\t%ld\t%ld\t%ld\t%ld\t%ld\t%ld\t%ld\t%ld\r\n",
-                    ROUTES.recordID, SERVICES.recordID, ROUTES.DIRECTIONSrecordID[nK], TRIPS.BUSTYPESrecordID,
-                    TRIPS.tripNumber, TRIPS.standard.blockNumber,
-                    fromTime, fromLocID, timeAtStop, PATTERNS.NODESrecordID);
-              _lwrite(hfOutputFile, szOutputString, strlen(szOutputString));
-            }
-            fromTime = timeAtStop;
-            fromLocID = PATTERNS.NODESrecordID;
+              NODESKey0.recordID = PATTERNS.NODESrecordID;
+              rcode2 = btrieve(B_GETEQUAL, TMS_NODES, &NODES, &NODESKey0, 0);
+              if(NODES.flags & NODES_FLAG_STOP)
+              {
+                timeAtStop = 0;
+                if(GTResults.tripDistance == 0)
+                {
+                  timeAtStop = GTResults.tripTimes[tripIndex - 1];
+                }
+                else
+                {
+                  distanceToHere += (float)GreatCircleDistance(prevLon, prevLat, NODES.longitude, NODES.latitude);
+                  timeAtStop = (long)((GTResults.tripTimes[tripIndex] - GTResults.tripTimes[tripIndex - 1]) *
+                        (distanceToHere / (tripDistances[tripIndex] - tripDistances[tripIndex - 1])));
+                  timeAtStop += (GTResults.tripTimes[tripIndex - 1]);
+                }
+              }
+              else
+              {
+                timeAtStop = GTResults.tripTimes[tripIndex];
+                tripIndex++;  
+                distanceToHere = 0.0;
+              }
+              prevLat = NODES.latitude;
+              prevLon = NODES.longitude;
+// 
+//  Output the associated stop number, if present
+//
+              recordID = PATTERNS.NODESrecordID;
+              if(!(PATTERNS.flags & PATTERNS_FLAG_BUSSTOP))
+              {
+                NODESKey0.recordID = PATTERNS.NODESrecordID;
+                rcode2 = btrieve(B_GETEQUAL, TMS_NODES, &NODES, &NODESKey0, 0);
+                if(NODES.number > 0)
+                {
+                  stopNumber = NODES.number;
+                }
+                else
+                {
+                  if(nK == 0)
+                  {
+                    stopNumber = NODES.OBStopNumber;
+                  }
+                  else
+                  {
+                    stopNumber = NODES.IBStopNumber;
+                  }
+                }
+                if(stopNumber > 0)
+                {
+                  for(nL = 0; nL < numNODESUBSET; nL++)
+                  {
+                    if(pNODESUBSET[nI].flags & NODES_FLAG_STOP)
+                    {
+                      if(pNODESUBSET[nI].number == stopNumber)
+                      {
+                        recordID = pNODESUBSET[nI].recordID;
+                        break;
+                      }
+                    }
+                  }
+                }
+              }
+              if(bFirst)
+              {
+                bFirst = FALSE;
+              }
+              else
+              {
+                sprintf(szOutputString, "%ld\t%ld\t%ld\t%ld\t%ld\t%ld\t%ld\t%ld\t%ld\t%ld\r\n",
+                      ROUTES.recordID, SERVICES.recordID, ROUTES.DIRECTIONSrecordID[nK], TRIPS.BUSTYPESrecordID,
+                      TRIPS.tripNumber, TRIPS.standard.blockNumber,
+                      fromTime, fromLocID, timeAtStop, recordID);
+                _lwrite(hfOutputFile, szOutputString, strlen(szOutputString));
+              }
+              fromTime = timeAtStop;
+              fromLocID = recordID;
 //
 //  Get the next node on the pattern
 //
-            prevLat = NODES.latitude;
-            prevLon = NODES.longitude;
-            rcode2 = btrieve(B_GETNEXT, TMS_PATTERNS, &PATTERNS, &PATTERNSKey2, 2);
-          }  // while patterns
+              rcode2 = btrieve(B_GETNEXT, TMS_PATTERNS, &PATTERNS, &PATTERNSKey2, 2);
+            }  // while patterns
+//          }
           rcode2 = btrieve(B_GETNEXT, TMS_TRIPS, &TRIPS, &TRIPSKey1, 1);
         }
       }  // for nK
@@ -1010,7 +1115,45 @@ BOOL FAR TMSRPT65(TMSRPTPassedDataDef *pPassedData)
                   ROUTES.recordID, SERVICES.recordID, ROUTES.DIRECTIONSrecordID[nK], PATTERNS.PATTERNNAMESrecordID);
             prevPattern = PATTERNS.PATTERNNAMESrecordID;
           }
-          sprintf(tempString, "\t%ld", PATTERNS.NODESrecordID);
+//
+//  Output the associated stop number, if present
+//
+          recordID = PATTERNS.NODESrecordID;
+          if(!(PATTERNS.flags & PATTERNS_FLAG_BUSSTOP))
+          {
+            NODESKey0.recordID = PATTERNS.NODESrecordID;
+            rcode2 = btrieve(B_GETEQUAL, TMS_NODES, &NODES, &NODESKey0, 0);
+            if(NODES.number > 0)
+            {
+              stopNumber = NODES.number;
+            }
+            else
+            {
+              if(nK == 0)
+              {
+                stopNumber = NODES.OBStopNumber;
+              }
+              else
+              {
+                stopNumber = NODES.IBStopNumber;
+              }
+            }
+            if(stopNumber > 0)
+            {
+              for(nL = 0; nL < numNODESUBSET; nL++)
+              {
+                if(pNODESUBSET[nI].flags & NODES_FLAG_STOP)
+                {
+                  if(pNODESUBSET[nI].number == stopNumber)
+                  {
+                    recordID = pNODESUBSET[nI].recordID;
+                    break;
+                  }
+                }
+              }
+            }
+          }
+          sprintf(tempString, "\t%ld", recordID);
           strcat(szOutputString, tempString);
           rcode2 = btrieve(B_GETNEXT, TMS_PATTERNS, &PATTERNS, &PATTERNSKey2, 2);
         }
@@ -1039,6 +1182,9 @@ BOOL FAR TMSRPT65(TMSRPTPassedDataDef *pPassedData)
     TMSError((HWND)NULL, MB_ICONINFORMATION, ERROR_328, (HANDLE)NULL);
   }
   _lclose(hfErrorLog);
+  
+  TMSHeapFree(pNODESUBSET);
+
 
   return(bFinishedOK);
 }

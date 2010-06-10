@@ -991,8 +991,8 @@ BOOL ProcessAbsenceRules(DAILYOPSDef *pDAILYOPS, BOOL bRegister)
         DAILYOPSKey3.DRIVERSrecordID = DRIVERS.recordID;
         DAILYOPSKey3.pertainsToDate = startDate;
         DAILYOPSKey3.pertainsToTime = NO_TIME;
-        DAILYOPSKey3.recordTypeFlag = DAILYOPS_FLAG_ABSENCE;
-        DAILYOPSKey3.recordFlags = 0;
+        DAILYOPSKey3.recordTypeFlag = NO_RECORD;
+        DAILYOPSKey3.recordFlags = NO_RECORD;
         totalMissouts = 0;
         rcode2 = btrieve(B_GETGREATER, TMS_DAILYOPS, &localDAILYOPS, &DAILYOPSKey3, 3);
         while(rcode2 == 0 &&
@@ -4219,8 +4219,7 @@ BOOL ProcessAbsenceRules(DAILYOPSDef *pDAILYOPS, BOOL bRegister)
       bRecordAbsence = TRUE;
       break;
 
-    case 112: // Floating holiday
-      bRecordAbsence = TRUE;
+    case 112: // * Unused *
       break;
 
     case 113: // Goodwill light duty
@@ -4320,6 +4319,34 @@ BOOL ProcessAbsenceRules(DAILYOPSDef *pDAILYOPS, BOOL bRegister)
       break;
 
     case 137: // Workers' compensation
+      bRecordAbsence = TRUE;
+      break;
+
+    case 212: // Run guarantee for injury
+      bRecordAbsence = TRUE;
+      break;
+
+    case 213: // Approved Personal Day
+      bRecordAbsence = TRUE;
+      break;
+
+    case 214: // Physical at Medical Center
+      bRecordAbsence = TRUE;
+      break;
+
+    case 215: // Personal Vacation Day
+      bRecordAbsence = TRUE;
+      break;
+
+    case 216: // Driver route review
+      bRecordAbsence = TRUE;
+      break;
+
+    case 217: // Student CDL test/Student Off
+      bRecordAbsence = TRUE;
+      break;
+
+    case 218: // New driver in training
       bRecordAbsence = TRUE;
       break;
 //
@@ -5401,8 +5428,8 @@ BOOL ProcessAbsenceRules(DAILYOPSDef *pDAILYOPS, BOOL bRegister)
         DAILYOPSKey3.DRIVERSrecordID = DRIVERS.recordID;
         DAILYOPSKey3.pertainsToDate = startDate;
         DAILYOPSKey3.pertainsToTime = NO_TIME;
-        DAILYOPSKey3.recordTypeFlag = DAILYOPS_FLAG_ABSENCE;
-        DAILYOPSKey3.recordFlags = 0;
+        DAILYOPSKey3.recordTypeFlag = NO_RECORD;
+        DAILYOPSKey3.recordFlags = NO_RECORD;
         totalMissouts = 0;
         rcode2 = btrieve(B_GETGREATER, TMS_DAILYOPS, &localDAILYOPS, &DAILYOPSKey3, 3);
         while(rcode2 == 0 &&
@@ -5588,6 +5615,86 @@ BOOL ProcessAbsenceRules(DAILYOPSDef *pDAILYOPS, BOOL bRegister)
 //  **********************
 //  *** End GLTC Rules ***
 //  **********************
+//
+//  ***********************************
+//  *** Start Everett Transit Rules ***
+//  ***********************************
+//
+//  Paid
+//
+    case 219:  // Sick (Paid)	013
+    case 221:  // Vacation (Paid)	014
+    case 222:  // Floating Holiday (Paid)	025
+    case 223:  // WFCA - Sick (Paid)	073
+    case 224:  // WFCA - Vacation (Paid)	078
+    case 226:  // FMLA - Sick (Paid)	053
+    case 227:  // FMLA - Vacation (Paid)	054
+    case 228:  // Funeral Leave (Paid)	060
+    case 230:  // Child Care (Paid)	064
+    case 231:  // Administrative Leave (Paid)	099
+    case 235:  // UOTO - City Request (Paid)	988
+    case 236:  // UOTO - Union Request (Paid)	998
+    case 238:  // Jury Duty (Paid)	997
+    case 240:  // Doctor's Appt (Paid)	013
+    case 241:  // Meeting (Paid)	
+    case 242:  // L&I (Unpaid)	027
+    case 243:  // Events (Paid)	
+    case 244:  // Emergency Leave (Paid)	014
+      if(bRegister)
+      {
+        paidTime[0] = pDAILYOPS->DOPS.Absence.timeLost;
+        unpaidTime = 0;
+        sprintf(tempString, "Paid time: %s\n\n", chhmm(paidTime[0]));
+        LoadString(hInst, TEXT_335, szarString, SZARSTRING_LENGTH);
+        strcat(tempString, szarString);
+        MessageBeep(MB_ICONQUESTION);
+        if(MessageBox(NULL, tempString, TMS, MB_ICONQUESTION | MB_YESNO) != IDYES)
+        {
+          return(FALSE);
+        }
+        bRecordAbsence = TRUE;
+      }
+      else
+      {
+      }
+      bCheckUnpaidTime = FALSE;
+      break;
+//
+//  Unpaid
+//
+    case 220:  // Sick (Unpaid)	063
+    case 225:  // FMLA (Unpaid)	051
+    case 229:  // Military Leave (Unpaid)	061
+    case 232:  // TOWP (Unpaid)	995
+    case 233:  // Suspension (Unpaid)	995
+    case 234:  // No Show (Unpaid)	995
+    case 237:  // Leave Without Pay (Unpaid)	999
+    case 239:  // Late Show (Unpaid)	995
+      if(bRegister)
+      {
+        paidTime[0] = 0;
+        unpaidTime = pDAILYOPS->DOPS.Absence.timeLost;
+        sprintf(tempString, "Unpaid time: %s\n\n", chhmm(unpaidTime));
+        LoadString(hInst, TEXT_335, szarString, SZARSTRING_LENGTH);
+        strcat(tempString, szarString);
+        MessageBeep(MB_ICONQUESTION);
+        if(MessageBox(NULL, tempString, TMS, MB_ICONQUESTION | MB_YESNO) != IDYES)
+        {
+          return(FALSE);
+        }
+        pDAILYOPS->recordFlags |= DAILYOPS_FLAG_DONTCOUNTASUNPAID;
+        bRecordAbsence = TRUE;
+        bCheckUnpaidTime = FALSE;
+      }
+      else  // Unregister
+      {
+      }
+      bCheckUnpaidTime = FALSE;
+      break;
+//
+//  *********************************
+//  *** End Everett Transit Rules ***
+//  *********************************
 //
 //
 //  The all-encompassing 99999 rule: Just record the absence - no associated rule
@@ -6058,7 +6165,7 @@ BOOL ProcessAbsenceRules(DAILYOPSDef *pDAILYOPS, BOOL bRegister)
     case 109: // Drug test (awaiting results)
     case 110: // Drug test (random/post-accident)
     case 111: // FMLA
-    case 112: // Floating holiday
+    case 112: // * Unused *
     case 113: // Goodwill light duty
     case 114: // Granted time off
     case 115: // Injury
@@ -6084,6 +6191,13 @@ BOOL ProcessAbsenceRules(DAILYOPSDef *pDAILYOPS, BOOL bRegister)
     case 135: // Vacation
     case 136: // Witness testify in court
     case 137: // Workers' compensation
+    case 212: // Run guarantee for injury
+    case 213: // Approved Personal Day
+    case 214: // Physical at Medical Center
+    case 215: // Personal Vacation Day
+    case 216: // Driver route review
+    case 217: // Student CDL test/Student Off
+    case 218: // New driver in training
       if(bRegister)
       {
         if(bRecordAbsence)
@@ -6369,6 +6483,93 @@ BOOL ProcessAbsenceRules(DAILYOPSDef *pDAILYOPS, BOOL bRegister)
         }
       }
       break;  // End of Santa Clarita Rules
+//
+//  Everett Transit Rules
+//
+    case 219:  // Sick (Paid)	013
+    case 220:  // Sick (Unpaid)	063
+    case 221:  // Vacation (Paid)	014
+    case 222:  // Floating Holiday (Paid)	025
+    case 223:  // WFCA - Sick (Paid)	073
+    case 224:  // WFCA - Vacation (Paid)	078
+    case 225:  // FMLA (Unpaid)	051
+    case 226:  // FMLA - Sick (Paid)	053
+    case 227:  // FMLA - Vacation (Paid)	054
+    case 228:  // Funeral Leave (Paid)	060
+    case 229:  // Military Leave (Unpaid)	061
+    case 230:  // Child Care (Paid)	064
+    case 231:  // Administrative Leave (Paid)	099
+    case 232:  // TOWP (Unpaid)	995
+    case 233:  // Suspension (Unpaid)	995
+    case 234:  // No Show (Unpaid)	995
+    case 235:  // UOTO - City Request (Paid)	988
+    case 236:  // UOTO - Union Request (Paid)	998
+    case 237:  // Leave Without Pay (Unpaid)	999
+    case 238:  // Jury Duty (Paid)	997
+    case 239:  // Late Show (Unpaid)	995
+    case 240:  // Doctor's Appt (Paid)	013
+    case 241:  // Meeting (Paid)	
+    case 242:  // L&I (Unpaid)	027
+    case 243:  // Events (Paid)	
+    case 244:  // Emergency Leave (Paid)	014
+      if(bRegister)
+      {
+        if(bRecordAbsence)
+        {
+          if(paidTime[0] == NO_TIME)
+          {
+            paidTime[0] = 0;
+          }
+          if(paidTime[1] == NO_TIME)
+          {
+            paidTime[1] = 0;
+          }
+          if(unpaidTime == NO_TIME)
+          {
+            unpaidTime = 0;
+          }
+          pDAILYOPS->DOPS.Absence.paidTime[0] = paidTime[0];
+          pDAILYOPS->DOPS.Absence.paidTime[1] = paidTime[1];
+          pDAILYOPS->DOPS.Absence.unpaidTime = unpaidTime;
+          pDAILYOPS->DOPS.Absence.timeLost = paidTime[0] + paidTime[1] + unpaidTime;
+          if(paidTime[0] > 0 || paidTime[1] > 0)
+          {
+            pDAILYOPS->recordFlags |= DAILYOPS_FLAG_ABSENCEPAID;
+          }
+          rcode2 = btrieve(B_INSERT, TMS_DAILYOPS, pDAILYOPS, &DAILYOPSKey0, 0);
+          if(rcode2 == 0)
+          {
+            m_LastDAILYOPSRecordID = DAILYOPS.recordID;
+          }
+        }
+      }
+//
+//  Unregister
+//
+      else
+      {
+//
+//  If a discipline record was generated, locate and delete it
+//
+        DISCIPLINEKey1.DRIVERSrecordID = DRIVERS.recordID;
+        DISCIPLINEKey1.dateOfOffense = NO_RECORD;
+        DISCIPLINEKey1.timeOfOffense = NO_RECORD;
+        rcode2 = btrieve(B_GETGREATER, TMS_DISCIPLINE, &DISCIPLINE, &DISCIPLINEKey1, 1);
+        while(rcode2 == 0 &&
+              DISCIPLINE.DRIVERSrecordID == DRIVERS.recordID)
+        {
+          if(DISCIPLINE.DAILYOPSrecordID == pDAILYOPS->DAILYOPSrecordID)
+          {
+            btrieve(B_DELETE, TMS_DISCIPLINE, &DISCIPLINE, &DISCIPLINEKey1, 1);
+            LoadString(hInst, TEXT_338, tempString, TEMPSTRING_LENGTH);
+            MessageBeep(MB_ICONINFORMATION);
+            MessageBox(NULL, tempString, TMS, MB_ICONINFORMATION | MB_OK);
+            break;
+          }
+          rcode2 = btrieve(B_GETNEXT, TMS_DISCIPLINE, &DISCIPLINE, &DISCIPLINEKey1, 1);
+        }
+      }
+      break;  // End of Everett Transit Rules
 //
 //  99999 - Generic "record absence" rule
 //

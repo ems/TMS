@@ -47,6 +47,7 @@ BOOL FAR TMSRPT88(TMSRPTPassedDataDef *pPassedData)
   long  startTime;
   long  deadheadTime;
   long  stopNumber;
+  long  lastTimepoint;
   char  outputString[1024];
   char  outputStringSave[1024];
   char *ptr;
@@ -403,57 +404,60 @@ BOOL FAR TMSRPT88(TMSRPTPassedDataDef *pPassedData)
   rcode2 = btrieve(B_GETFIRST, TMS_NODES, &NODES, &NODESKey0, 0);
   while(rcode2 == 0)
   {
-    strcpy(outputString, "'STOPPOINT';");
+    if(NODES.flags & NODES_FLAG_STOP)
+    {
+      strcpy(outputString, "'STOPPOINT';");
 //
 //  StopAreaID (NODES.recordID)
 //
-    sprintf(tempString, "%ld;", NODES.recordID);
-    strcat(outputString, tempString);
+      sprintf(tempString, "%ld;", NODES.recordID);
+      strcat(outputString, tempString);
 //
 //  StopPointID (NODES.recordID)
 //
-    sprintf(tempString, "%ld;", NODES.recordID);
-    strcat(outputString, tempString);
+      sprintf(tempString, "%ld;", NODES.recordID);
+      strcat(outputString, tempString);
 //
 //  PointID (NODES.recordID)
 //
-    sprintf(tempString, "%ld;", NODES.recordID);
-    strcat(outputString, tempString);
+      sprintf(tempString, "%ld;", NODES.recordID);
+      strcat(outputString, tempString);
 //
 //  Name (NODES.description)
 //
-    strncpy(tempString, NODES.intersection, NODES_DESCRIPTION_LENGTH);
-    trim(tempString, NODES_DESCRIPTION_LENGTH);
-    ptr = strstr(tempString, "&&");  // Get rid of the MapInfo convention
-    if(ptr)
-    {
-      *ptr = 'a';
-      *(ptr + 1) = 't';
-    }
-    sprintf(szarString, "'%s';", tempString);
-    strcat(outputString, szarString);
+      strncpy(tempString, NODES.intersection, NODES_DESCRIPTION_LENGTH);
+      trim(tempString, NODES_DESCRIPTION_LENGTH);
+      ptr = strstr(tempString, "&&");  // Get rid of the MapInfo convention
+      if(ptr)
+      {
+        *ptr = 'a';
+        *(ptr + 1) = 't';
+      }
+      sprintf(szarString, "'%s';", tempString);
+      strcat(outputString, szarString);
 //
 //  StopPointNumber (not used)
 //
-    strcat(outputString, ";");
+      strcat(outputString, "'';");
 //
 //  ExternalID (NODES.abbrName)
 //
-    strncpy(tempString, NODES.abbrName, NODES_ABBRNAME_LENGTH);
-    trim(tempString, NODES_ABBRNAME_LENGTH);
-    sprintf(szarString, "'%s';", tempString);
-    strcat(outputString, szarString);
+      strncpy(tempString, NODES.abbrName, NODES_ABBRNAME_LENGTH);
+      trim(tempString, NODES_ABBRNAME_LENGTH);
+      sprintf(szarString, "'%s';", tempString);
+      strcat(outputString, szarString);
 //
 //  ShortName Was NODES.abbrName, now NODES.longName.
 //
-    strncpy(tempString, NODES.longName, NODES_LONGNAME_LENGTH);
-    trim(tempString, NODES_LONGNAME_LENGTH);
-    sprintf(szarString, "'%s';\r\n", tempString);
-    strcat(outputString, szarString);
+      strncpy(tempString, NODES.longName, NODES_LONGNAME_LENGTH);
+      trim(tempString, NODES_LONGNAME_LENGTH);
+      sprintf(szarString, "'%s';\r\n", tempString);
+      strcat(outputString, szarString);
 //
 //  Write it out and get the next node
 //
-    _lwrite(hfOutputFile, outputString, strlen(outputString));
+      _lwrite(hfOutputFile, outputString, strlen(outputString));
+    }
     rcode2 = btrieve(B_GETNEXT, TMS_NODES, &NODES, &NODESKey0, 0);
   }
 //
@@ -732,8 +736,15 @@ BOOL FAR TMSRPT88(TMSRPTPassedDataDef *pPassedData)
       {
         goto done;
       }
-      sprintf(outputString, "'CALENDAR';%d-%02d-%02d;1;\r\n",
-            tmED.tm_year + 1900, tmED.tm_mon + 1, tmED.tm_mday);
+//
+//  Figure out the service day
+//
+      nI = (tmED.tm_wday == 0 ? 6 : tmED.tm_wday - 1);
+//
+//  Create the record
+//
+      sprintf(outputString, "'CALENDAR';%d-%02d-%02d;%ld;\r\n",
+            tmED.tm_year + 1900, tmED.tm_mon + 1, tmED.tm_mday, ROSTERPARMS.serviceDays[nI]);
 //
 //  Write out the record
 //
@@ -857,12 +868,12 @@ BOOL FAR TMSRPT88(TMSRPTPassedDataDef *pPassedData)
             {
               strcpy(outputString, outputStringSave);
 //
-//  'DEADRUN';6
+//  'DEADRUN'
 //  JourneyID (not used)
 //  JourneyPatternID (not used)
 //  TimetableID Was 1, now SERVICES.recordID;
 //
-              sprintf(tempString, "'DEADRUN';6;;;%ld;", TRIPS.SERVICESrecordID);
+              sprintf(tempString, "'DEADRUN';;;%ld;", TRIPS.SERVICESrecordID);
               strcat(outputString, tempString);
 //
 //  Start time
@@ -878,13 +889,13 @@ BOOL FAR TMSRPT88(TMSRPTPassedDataDef *pPassedData)
 //  Regular trip data
 //
 //
-//  'NORMAL';1
+//  'NORMAL'
 //  JourneyID (not used)
 //  JourneyPatternID (not used)
 //  TimetableID Was 1, now SERVICES.recordID
 //
           strcpy(outputString, outputStringSave);
-          sprintf(tempString, "'NORMAL';1;;;%ld;", SERVICES.recordID);
+          sprintf(tempString, "'NORMAL';;;%ld;", SERVICES.recordID);
           strcat(outputString, tempString);
 //
 //  Start time
@@ -917,12 +928,12 @@ BOOL FAR TMSRPT88(TMSRPTPassedDataDef *pPassedData)
             {
               strcpy(outputString, outputStringSave);
 //
-//  'DEADRUN';6
+//  'DEADRUN'
 //  JourneyID (not used)
 //  JourneyPatternID (not used)
 //  TimetableID Was 1, now SERVICES.recordID
 //
-              sprintf(tempString, "'DEADRUN';6;;;%ld;", SERVICES.recordID);
+              sprintf(tempString, "'DEADRUN';;;%ld;", SERVICES.recordID);
               strcat(outputString, tempString);
 //
 //  Start time (which is really the last time on the trip)
@@ -1021,7 +1032,7 @@ BOOL FAR TMSRPT88(TMSRPTPassedDataDef *pPassedData)
 //  LineID (ROUTES.recordID)
 //  JourneyNumber (TRIPS.tripNumber)
 //
-          sprintf(outputStringSave, "'POINTJOURNEY';1;%ld;%ld;",
+          sprintf(outputStringSave, "'POINTINJOURNEY';1;%ld;%ld;",
                 ROUTES.recordID, TRIPS.tripNumber);
 //
 //  Generate the trip
@@ -1073,6 +1084,7 @@ BOOL FAR TMSRPT88(TMSRPTPassedDataDef *pPassedData)
               }
               prevLat = NODES.latitude;
               prevLon = NODES.longitude;
+              lastTimepoint = PATTERNS.NODESrecordID;
               rcode2 = btrieve(B_GETNEXT, TMS_PATTERNS, &PATTERNS, &PATTERNSKey2, 2);
             }
           }
@@ -1148,10 +1160,12 @@ BOOL FAR TMSRPT88(TMSRPTPassedDataDef *pPassedData)
             }
             else
             {
-              sprintf(szarString, "%ld:%02ld:%02ld", timeAtStop / 3600, (timeAtStop % 3600) / 60, timeAtStop % 60);
+              sprintf(szarString, "%02ld:%02ld:%02ld", timeAtStop / 3600, (timeAtStop % 3600) / 60, timeAtStop % 60);
             }
-            sprintf(tempString, "%d;%ld;%s;;;%s;;;;;;;%ld;\r\n",
-                  seq++, PATTERNS.NODESrecordID, szarString,
+            sprintf(tempString, "%d;%ld;%s;%s;;%s;;;;;;;%ld;\r\n",
+                  seq++, PATTERNS.NODESrecordID,
+                  (timeAtStop == GTResults.lastNodeTime ? "" : szarString),
+                  (timeAtStop == GTResults.lastNodeTime ? szarString : ""),
                   ((NODES.flags & NODES_FLAG_STOP) ? "no" : "yes"), SERVICES.recordID);
             strcat(outputString, tempString);
             _lwrite(hfOutputFile, outputString, strlen(outputString));
@@ -1377,7 +1391,7 @@ BOOL FAR TMSRPT88(TMSRPTPassedDataDef *pPassedData)
 //  BlockID (not used)
 //
           sprintf(tempString, "%ld", TRIPS.standard.blockNumber);
-          sprintf(outputString, "'JOURNEYINBLOCK';%ld, ;1;'%s';%d;%ld;%ld;;;\r\n",
+          sprintf(outputString, "'JOURNEYINBLOCK';%ld;1;'%s';%d;%ld;%ld;;;\r\n",
                 SERVICES.recordID, tempString, seq, TRIPS.ROUTESrecordID, TRIPS.tripNumber);
 //
 //  Write it
@@ -1450,7 +1464,7 @@ BOOL FAR TMSRPT88(TMSRPTPassedDataDef *pPassedData)
     {
 //
 //  CompanyID (1)
-//  Line Name (ROUTES.name)
+//  Line Name *Changed from ROUTES.name to ROUTES.number 14-Apr-10
 //  Line ID (ROUTES.recordID)
 //  External ID (ROUTES.number)
 //  Description (ROUTES.name)
@@ -1464,8 +1478,8 @@ BOOL FAR TMSRPT88(TMSRPTPassedDataDef *pPassedData)
       {
         ptr++;
       }
-      sprintf(outputString, "'LINE';1;'%s';%ld;'%s';\r\n",
-            tempString, ROUTES.recordID, ptr, tempString);
+      sprintf(outputString, "'LINE';1;'%s';%ld;'%s';'%s - %s';\r\n",
+            ptr, ROUTES.recordID, ptr, ptr, tempString);
       _lwrite(hfOutputFile, outputString, strlen(outputString));
     }
 //

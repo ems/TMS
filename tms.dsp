@@ -298,6 +298,14 @@ SOURCE=.\BIDDING.c
 # End Source File
 # Begin Source File
 
+SOURCE=.\BinPackRuncut.cpp
+# End Source File
+# Begin Source File
+
+SOURCE=.\BinRuncutSolve.cpp
+# End Source File
+# Begin Source File
+
 SOURCE=.\BitmapCtrl.cpp
 # End Source File
 # Begin Source File
@@ -455,6 +463,10 @@ SOURCE=.\cover.cpp
 # Begin Source File
 
 SOURCE=.\Crewcut.c
+# End Source File
+# Begin Source File
+
+SOURCE=.\CrossEntropyRuncut.cpp
 # End Source File
 # Begin Source File
 
@@ -807,6 +819,10 @@ SOURCE=.\GetTMSData.cpp
 # Begin Source File
 
 SOURCE=.\GLIB.CPP
+# End Source File
+# Begin Source File
+
+SOURCE=.\GraspRuncut.cpp
 # End Source File
 # Begin Source File
 
@@ -2054,6 +2070,10 @@ SOURCE=.\AuditFilter.h
 # End Source File
 # Begin Source File
 
+SOURCE=.\BinPackRuncut.h
+# End Source File
+# Begin Source File
+
 SOURCE=.\BitmapCtrl.h
 # End Source File
 # Begin Source File
@@ -2167,6 +2187,10 @@ SOURCE=.\CopyRuncut.h
 # Begin Source File
 
 SOURCE=.\cover.h
+# End Source File
+# Begin Source File
+
+SOURCE=.\CrossEntropyRuncut.h
 # End Source File
 # Begin Source File
 
@@ -2498,7 +2522,15 @@ SOURCE=.\Garages.h
 # End Source File
 # Begin Source File
 
+SOURCE=.\GraspRuncut.h
+# End Source File
+# Begin Source File
+
 SOURCE=.\Hash.h
+# End Source File
+# Begin Source File
+
+SOURCE=.\hash_buf.h
 # End Source File
 # Begin Source File
 
@@ -2643,6 +2675,10 @@ SOURCE=.\mm.h
 # Begin Source File
 
 SOURCE=.\msmask.h
+# End Source File
+# Begin Source File
+
+SOURCE=.\multi_cmp.h
 # End Source File
 # Begin Source File
 
@@ -3183,58 +3219,58 @@ SOURCE=.\res\watch.bmp
 # End Group
 # End Target
 # End Project
-# Section tms : {E675F3F0-91B5-11D0-9484-00A0C91110ED}
-# 	2:5:Class:CDataFormatDisp
-# 	2:10:HeaderFile:dataformatdisp.h
-# 	2:8:ImplFile:dataformatdisp.cpp
-# End Section
 # Section tms : {CDE57A54-8B86-11D0-B3C6-00A0C90AEA82}
 # 	2:5:Class:CSplit
 # 	2:10:HeaderFile:split.h
 # 	2:8:ImplFile:split.cpp
 # End Section
-# Section tms : {99FF4676-FFC3-11D0-BD02-00C04FC2FB86}
-# 	2:5:Class:CStdDataFormatsDisp
-# 	2:10:HeaderFile:stddataformatsdisp.h
-# 	2:8:ImplFile:stddataformatsdisp.cpp
+# Section tms : {E675F3F0-91B5-11D0-9484-00A0C91110ED}
+# 	2:5:Class:CDataFormatDisp
+# 	2:10:HeaderFile:dataformatdisp.h
+# 	2:8:ImplFile:dataformatdisp.cpp
 # End Section
 # Section tms : {13E5102B-A52B-11D0-86DA-00608CB9FBFB}
 # 	2:5:Class:CF1ReplaceResults1
 # 	2:10:HeaderFile:f1replaceresults1.h
 # 	2:8:ImplFile:f1replaceresults1.cpp
 # End Section
-# Section tms : {3FA3EA6B-D886-4689-87E5-2EFB3101F16B}
-# 	2:5:Class:CCrystalReportViewer11
-# 	2:10:HeaderFile:crystalreportviewer11.h
-# 	2:8:ImplFile:crystalreportviewer11.cpp
-# End Section
-# Section tms : {13E51003-A52B-11D0-86DA-00608CB9FBFB}
-# 	2:21:DefaultSinkHeaderFile:f1book1.h
-# 	2:16:DefaultSinkClass:CF1Book1
-# End Section
-# Section tms : {CDE57A53-8B86-11D0-B3C6-00A0C90AEA82}
-# 	2:5:Class:CSplits
-# 	2:10:HeaderFile:splits.h
-# 	2:8:ImplFile:splits.cpp
-# End Section
-# Section tms : {CDE57A43-8B86-11D0-B3C6-00A0C90AEA82}
-# 	2:21:DefaultSinkHeaderFile:datagrid.h
-# 	2:16:DefaultSinkClass:CDataGrid
+# Section tms : {99FF4676-FFC3-11D0-BD02-00C04FC2FB86}
+# 	2:5:Class:CStdDataFormatsDisp
+# 	2:10:HeaderFile:stddataformatsdisp.h
+# 	2:8:ImplFile:stddataformatsdisp.cpp
 # End Section
 # Section tms : {CDE57A4F-8B86-11D0-B3C6-00A0C90AEA82}
 # 	2:5:Class:CColumn
 # 	2:10:HeaderFile:column.h
 # 	2:8:ImplFile:column.cpp
 # End Section
-# Section tms : {13E51023-A52B-11D0-86DA-00608CB9FBFB}
-# 	2:5:Class:CF1FileSpec1
-# 	2:10:HeaderFile:f1filespec1.h
-# 	2:8:ImplFile:f1filespec1.cpp
+# Section tms : {CDE57A43-8B86-11D0-B3C6-00A0C90AEA82}
+# 	2:21:DefaultSinkHeaderFile:datagrid.h
+# 	2:16:DefaultSinkClass:CDataGrid
+# End Section
+# Section tms : {CDE57A53-8B86-11D0-B3C6-00A0C90AEA82}
+# 	2:5:Class:CSplits
+# 	2:10:HeaderFile:splits.h
+# 	2:8:ImplFile:splits.cpp
+# End Section
+# Section tms : {13E51003-A52B-11D0-86DA-00608CB9FBFB}
+# 	2:21:DefaultSinkHeaderFile:f1book1.h
+# 	2:16:DefaultSinkClass:CF1Book1
+# End Section
+# Section tms : {3FA3EA6B-D886-4689-87E5-2EFB3101F16B}
+# 	2:5:Class:CCrystalReportViewer11
+# 	2:10:HeaderFile:crystalreportviewer11.h
+# 	2:8:ImplFile:crystalreportviewer11.cpp
 # End Section
 # Section tms : {C3E95CF4-64BC-11D3-8D9C-4EE4B9000000}
 # 	2:5:Class:CSDIGrid
 # 	2:10:HeaderFile:sdigrid.h
 # 	2:8:ImplFile:sdigrid.cpp
+# End Section
+# Section tms : {13E51023-A52B-11D0-86DA-00608CB9FBFB}
+# 	2:5:Class:CF1FileSpec1
+# 	2:10:HeaderFile:f1filespec1.h
+# 	2:8:ImplFile:f1filespec1.cpp
 # End Section
 # Section tms : {BEF6E003-A874-101A-8BBA-00AA00300CAB}
 # 	2:5:Class:COleFont1
@@ -3251,6 +3287,16 @@ SOURCE=.\res\watch.bmp
 # 	2:10:HeaderFile:selbookmarks.h
 # 	2:8:ImplFile:selbookmarks.cpp
 # End Section
+# Section tms : {13E51042-A52B-11D0-86DA-00608CB9FBFB}
+# 	2:5:Class:CF1ObjPos1
+# 	2:10:HeaderFile:f1objpos1.h
+# 	2:8:ImplFile:f1objpos1.cpp
+# End Section
+# Section tms : {13E51032-A52B-11D0-86DA-00608CB9FBFB}
+# 	2:5:Class:CF1BookView1
+# 	2:10:HeaderFile:f1bookview1.h
+# 	2:8:ImplFile:f1bookview1.cpp
+# End Section
 # Section tms : {7BF80981-BF32-101A-8BBB-00AA00300CAB}
 # 	2:5:Class:CPicture
 # 	2:10:HeaderFile:picture1.h
@@ -3261,30 +3307,20 @@ SOURCE=.\res\watch.bmp
 # 	2:10:HeaderFile:crvtrackcursorinfo.h
 # 	2:8:ImplFile:crvtrackcursorinfo.cpp
 # End Section
-# Section tms : {13E51032-A52B-11D0-86DA-00608CB9FBFB}
-# 	2:5:Class:CF1BookView1
-# 	2:10:HeaderFile:f1bookview1.h
-# 	2:8:ImplFile:f1bookview1.cpp
-# End Section
-# Section tms : {13E51042-A52B-11D0-86DA-00608CB9FBFB}
-# 	2:5:Class:CF1ObjPos1
-# 	2:10:HeaderFile:f1objpos1.h
-# 	2:8:ImplFile:f1objpos1.cpp
-# End Section
 # Section tms : {CDE57A41-8B86-11D0-B3C6-00A0C90AEA82}
 # 	2:5:Class:CDataGrid
 # 	2:10:HeaderFile:datagrid.h
 # 	2:8:ImplFile:datagrid.cpp
 # End Section
-# Section tms : {13E51001-A52B-11D0-86DA-00608CB9FBFB}
-# 	2:5:Class:CF1Book1
-# 	2:10:HeaderFile:f1book1.h
-# 	2:8:ImplFile:f1book1.cpp
-# End Section
 # Section tms : {13E5103D-A52B-11D0-86DA-00608CB9FBFB}
 # 	2:5:Class:CF1CellFormat1
 # 	2:10:HeaderFile:f1cellformat1.h
 # 	2:8:ImplFile:f1cellformat1.cpp
+# End Section
+# Section tms : {13E51001-A52B-11D0-86DA-00608CB9FBFB}
+# 	2:5:Class:CF1Book1
+# 	2:10:HeaderFile:f1book1.h
+# 	2:8:ImplFile:f1book1.cpp
 # End Section
 # Section tms : {FE387538-44A3-11D1-B5B7-0000C09000C4}
 # 	2:5:Class:CFlatSB1
@@ -3295,33 +3331,33 @@ SOURCE=.\res\watch.bmp
 # 	2:21:DefaultSinkHeaderFile:crystalreportviewer11.h
 # 	2:16:DefaultSinkClass:CCrystalReportViewer11
 # End Section
-# Section tms : {CDE57A50-8B86-11D0-B3C6-00A0C90AEA82}
-# 	2:5:Class:CColumns
-# 	2:10:HeaderFile:columns.h
-# 	2:8:ImplFile:columns.cpp
-# End Section
-# Section tms : {FE38753A-44A3-11D1-B5B7-0000C09000C4}
-# 	2:21:DefaultSinkHeaderFile:flatsb1.h
-# 	2:16:DefaultSinkClass:CFlatSB1
-# End Section
-# Section tms : {C3E95CF6-64BC-11D3-8D9C-4EE4B9000000}
-# 	2:21:DefaultSinkHeaderFile:sdigrid.h
-# 	2:16:DefaultSinkClass:CSDIGrid
-# End Section
 # Section tms : {13E51035-A52B-11D0-86DA-00608CB9FBFB}
 # 	2:5:Class:CF1NumberFormat1
 # 	2:10:HeaderFile:f1numberformat1.h
 # 	2:8:ImplFile:f1numberformat1.cpp
 # End Section
-# Section tms : {13E51040-A52B-11D0-86DA-00608CB9FBFB}
-# 	2:5:Class:CF1Rect1
-# 	2:10:HeaderFile:f1rect1.h
-# 	2:8:ImplFile:f1rect1.cpp
+# Section tms : {C3E95CF6-64BC-11D3-8D9C-4EE4B9000000}
+# 	2:21:DefaultSinkHeaderFile:sdigrid.h
+# 	2:16:DefaultSinkClass:CSDIGrid
+# End Section
+# Section tms : {FE38753A-44A3-11D1-B5B7-0000C09000C4}
+# 	2:21:DefaultSinkHeaderFile:flatsb1.h
+# 	2:16:DefaultSinkClass:CFlatSB1
+# End Section
+# Section tms : {CDE57A50-8B86-11D0-B3C6-00A0C90AEA82}
+# 	2:5:Class:CColumns
+# 	2:10:HeaderFile:columns.h
+# 	2:8:ImplFile:columns.cpp
 # End Section
 # Section tms : {13E51020-A52B-11D0-86DA-00608CB9FBFB}
 # 	2:5:Class:CF1RangeRef1
 # 	2:10:HeaderFile:f1rangeref1.h
 # 	2:8:ImplFile:f1rangeref1.cpp
+# End Section
+# Section tms : {13E51040-A52B-11D0-86DA-00608CB9FBFB}
+# 	2:5:Class:CF1Rect1
+# 	2:10:HeaderFile:f1rect1.h
+# 	2:8:ImplFile:f1rect1.cpp
 # End Section
 # Section tms : {13E51029-A52B-11D0-86DA-00608CB9FBFB}
 # 	2:5:Class:CF1ODBCQuery1

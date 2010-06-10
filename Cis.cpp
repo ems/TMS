@@ -363,11 +363,17 @@ void	CIS::addTravel( const tod_t fromTime, const ident_t fromLoc, const tod_t to
                     const ident_t idCISroute, const ident_t idCISdirection, const ident_t idTrip, const ident_t idBlock,
                     const ident_t idCISvehicle, const ident_t idService )
 {
-	// The locations must be present or this will crash (and rightly so!)
+	// The locations, route, vehicle and service must be present or this will crash (and rightly so!)
 	CISlocation	*from	 = locations.find(fromLoc).data();
 	CISlocation	*to		 = locations.find(toLoc).data();
 
 	CISroute	*route	 = routes.find(combineRouteDirectionID(idCISroute,idCISdirection)).data();
+	if( !vehicles.contains(idCISvehicle) )
+	{
+		char	sz[128];
+		sprintf( sz, "Unknown Vehicle ID=%uld", idCISvehicle );
+		addVehicle( idCISvehicle, sz );
+	}
 	CISvehicle	*vehicle = vehicles.find(idCISvehicle).data();
 	CISservice  *service = services.find(idService).data();
 
@@ -1186,7 +1192,8 @@ CIS::PlanStatus CIS::plan( const char *szLeave, const Point leave, const long fr
 	else
 	{
 		// Only consider the given nodes and its equivalences.
-		closestLeave[closestLeaveNum++].set( leavePoint, (ident_t)service->locations.find(fromNODESrecordID).data() );
+		if( service->locations.contains(fromNODESrecordID) )
+			closestLeave[closestLeaveNum++].set( leavePoint, (ident_t)service->locations.find(fromNODESrecordID).data() );
 		CISnodeEquivalences::IDIDHash::iterator n = nodeEquivalences.nodes.find(fromNODESrecordID);
 		if( n != nodeEquivalences.nodes.end() )
 		{
@@ -1203,7 +1210,8 @@ CIS::PlanStatus CIS::plan( const char *szLeave, const Point leave, const long fr
 			}
 		}
 
-		closestArrive[closestArriveNum++].set( arrivePoint, (ident_t)service->locations.find(toNODESrecordID).data() );
+		if( service->locations.contains(toNODESrecordID) )
+			closestArrive[closestArriveNum++].set( arrivePoint, (ident_t)service->locations.find(toNODESrecordID).data() );
 		n = nodeEquivalences.nodes.find(toNODESrecordID);
 		if( n != nodeEquivalences.nodes.end() )
 		{

@@ -692,6 +692,8 @@ BOOL FAR TMSRPT29(TMSRPTPassedDataDef *pPassedData)
 //
 //  PATTERNS.reserved
 //
+        memset(&PATTERNS.fromText, 0x00, PATTERNS_FROMTEXT_LENGTH);
+        memset(&PATTERNS.toText, 0x00, PATTERNS_TOTEXT_LENGTH);
         memset(&PATTERNS.reserved, 0x00, PATTERNS_RESERVED_LENGTH);
 //
 //  PATTERNS.flags
@@ -1221,6 +1223,8 @@ long DeterminePattern(long ROUTESrecordID,
     PATTERNNAMES.COMMENTSrecordID = NO_RECORD;
     strcpy(PATTERNNAMES.name, szarString);
     pad(PATTERNNAMES.name, PATTERNNAMES_NAME_LENGTH);
+    memset(&PATTERNS.fromText, 0x00, PATTERNS_FROMTEXT_LENGTH);
+    memset(&PATTERNS.toText, 0x00, PATTERNS_TOTEXT_LENGTH);
     memset(PATTERNNAMES.reserved, 0x00, PATTERNNAMES_RESERVED_LENGTH);
     PATTERNNAMES.flags = 0;
     rcode2 = btrieve(B_INSERT, TMS_PATTERNNAMES, &PATTERNNAMES, &PATTERNNAMESKey0, 0);
@@ -1252,6 +1256,8 @@ long DeterminePattern(long ROUTESrecordID,
     PATTERNS.PATTERNNAMESrecordID = PATTERNNAMESrecordID;
     PATTERNS.NODESrecordID = basePatternNodes[nI];
     PATTERNS.nodeSequence = (long)(nI + 1) * 10000L;
+    memset(&PATTERNS.fromText, 0x00, PATTERNS_FROMTEXT_LENGTH);
+    memset(&PATTERNS.toText, 0x00, PATTERNS_TOTEXT_LENGTH);
     memset(&PATTERNS.reserved, 0x00, PATTERNS_RESERVED_LENGTH);
     PATTERNS.flags = (bFirst ? PATTERNS_FLAG_MLP : 0);
     bFirst = FALSE;

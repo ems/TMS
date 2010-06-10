@@ -72,6 +72,7 @@ int CTMSApp::RenderField(CF1Book *F1, TableDisplayDef *pTD, int index,
   long  timeAtNode;
   char  onTchar[16];
   char  offTchar[16];
+  char  szSpreadTime[16];
   char  tempString[256];
   long  year, month, day;
   char  *daysOfTheWeek[] = {"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"};
@@ -454,11 +455,19 @@ int CTMSApp::RenderField(CF1Book *F1, TableDisplayDef *pTD, int index,
     strcpy(outString, chhmm(RUNSVIEW[pieceNumber].platformTime));
     break;
 
-  case TMSDATA_RPT + DATATYPE_BIT:
-    tempLong = RUNSVIEW[pieceNumber].reportTime +
-          RUNSVIEW[pieceNumber].reportTime +
-          RUNSVIEW[pieceNumber].travelTime;
-    strcpy(outString, chhmm(tempLong));
+  case TMSDATA_REPORTATLOCATION + DATATYPE_BIT:
+    NODESKey0.recordID = RUNSVIEW[pieceNumber].startOfPieceNODESrecordID;
+    rcode2 = btrieve(B_GETEQUAL, TMS_NODES, &NODES, &NODESKey0, 0);
+    if(rcode2 != 0)
+    {
+      strcpy(outString, "");
+    }
+    else
+    {
+      strncpy(abbrName, NODES.abbrName, NODES_ABBRNAME_LENGTH);
+      trim(abbrName, NODES_ABBRNAME_LENGTH);
+      strcpy(outString, abbrName);
+    }
     break;
 
   case TMSDATA_REPORTTIME + DATATYPE_BIT:
@@ -1261,14 +1270,15 @@ int CTMSApp::RenderField(CF1Book *F1, TableDisplayDef *pTD, int index,
 //
           strcpy(onTchar, Tchar(startTime));
           strcpy(offTchar, Tchar(endTime));
+          strcpy(szSpreadTime, chhmm(endTime - startTime));
           nI = (short int)LOWORD(cutAsRuntype);
           nJ = (short int)HIWORD(cutAsRuntype);
           if(nI >= 0 && nJ >= 0 && nI < NUMRUNTYPES && nJ < NUMRUNTYPESLOTS)
           {
             strcpy(tempString, chhmm(extraboardTotal));
-            sprintf(outString, "Run: %ld\nPay: %s\n%s\nOn: %s\nAt: %s\nOff: %s\nAt: %s\nIncl XBD: %s",
+            sprintf(outString, "Run: %ld\nPay: %s\n%s\nOn: %s\nAt: %s\nOff: %s\nAt: %s\nIncl XBD: %s\nSpread: %s",
                  runNumber, chhmm(COST.TOTAL.payTime), RUNTYPE[nI][nJ].localName,
-                 onTchar, onNodeName, offTchar, offNodeName, tempString);
+                 onTchar, onNodeName, offTchar, offNodeName, tempString, szSpreadTime);
           }
           else
           {

@@ -1524,6 +1524,7 @@ void CTMSApp::OnEditUpdateTripNumber()
 //  ID_EDIT_UPDATE_RANGE_VEHICLES
 //  ID_EDIT_UPDATE_RANGE_LAYOVER
 //  ID_EDIT_UPDATE_RANGE_SHIFT
+//  ID_EDIT_UPDATE_RANGE_TRIPNUMBERS
 //
 void CTMSApp::OnEditUpdateRangePatterns()
 {
@@ -1552,6 +1553,10 @@ void CTMSApp::OnEditUpdateRangeLayover()
 void CTMSApp::OnEditUpdateRangeShift()
 {
   OnEditChangeTripData(ID_EDIT_UPDATE_RANGE_SHIFT);
+}
+void CTMSApp::OnEditUpdateRangeTripnumbers()
+{
+  OnEditChangeTripData(ID_EDIT_UPDATE_RANGE_TRIPNUMBERS);
 }
 void CTMSApp::OnEditChangeTripData(WPARAM which)
 {
@@ -1665,6 +1670,11 @@ void CTMSApp::OnEditChangeTripData(WPARAM which)
       {
         bRC = DialogBoxParam(hInst, MAKEINTRESOURCE(IDD_CHANGETRIPSHIFT),
               pTD->pane->m_hWnd, (DLGPROC)CHANGETRIPSHIFTMsgProc, (LPARAM)&PassedData);
+      }
+      else if(which == ID_EDIT_UPDATE_RANGE_TRIPNUMBERS)
+      {
+        bRC = DialogBoxParam(hInst, MAKEINTRESOURCE(IDD_CHANGETRIPNUMBERS),
+              pTD->pane->m_hWnd, (DLGPROC)CHANGETRIPNUMBERSMsgProc, (LPARAM)&PassedData);
       }
       if(bRC)
       {

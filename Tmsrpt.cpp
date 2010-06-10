@@ -753,7 +753,7 @@ void CTMSApp::TMSRpt(void)
 //
   TMSRPT[60].flags = TMSRPTFLAG_DOWNLOAD;
   TMSRPT[60].originalReportNumber = 60;
-  strcpy(TMSRPT[60].szReportName, "AVL - Orbital OrbCAD Interface Download");
+  strcpy(TMSRPT[60].szReportName, "AVL - ACS OrbCAD Interface Download");
   TMSRPT[60].numReports = 1;
   strcpy(TMSRPT[60].szReportFileName[0], "");  // This report doesn't use Crystal
   TMSRPT[60].lpRoutine = TMSRPT61;

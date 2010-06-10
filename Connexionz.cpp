@@ -5,6 +5,7 @@ extern "C"{
 }  // EXTERN C
 
 #include "tms.h"
+#include "AVLInterface.h"
 #include "wininet.h"
 #import "msxml3.dll"
 using namespace MSXML2;
@@ -24,7 +25,7 @@ void CNZAddAssignment(long DAILYOPSrecordID, long DRIVERSrecordID, long RUNSreco
   int day   = atol(&pszDateTime[8]);
 
   CTime date(year, month, day, 0, 0, 0);
-  date += CTimeSpan(1, 0, 0, 0);
+//  date += CTimeSpan(1, 0, 0, 0);
 
   CString sDate = date.Format("%Y-%m-%d");
 
@@ -115,13 +116,13 @@ void CNZAddAssignment(long DAILYOPSrecordID, long DRIVERSrecordID, long RUNSreco
   vPassword.vt = VT_BSTR;
   vPassword.bstrVal = NULL;
 
-  pIXMLHTTPRequest->open("POST ", "http://tin-sql/rtt/realtime/utility/External.asmx", vAsync, "", "");
+  pIXMLHTTPRequest->open("POST ", szPostAddress, vAsync, "", "");
 //
 //  Send the headers
 //
 //  Host
 //
-  pIXMLHTTPRequest->setRequestHeader("Host", "tin-sql");
+  pIXMLHTTPRequest->setRequestHeader("Host", szHostAddress);
 //
 //  Content type
 //

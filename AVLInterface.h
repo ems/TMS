@@ -13,6 +13,9 @@ EXTERN AVLInterfaceRoutineAddDriverDef      m_AddDriver;
 EXTERN AVLInterfaceRoutineAddBusDef         m_AddBus;
 EXTERN AVLInterfaceRoutineInitDef           m_InitClient;
 
+EXTERN char szPostAddress[128];
+EXTERN char szHostAddress[128];
+
 EXTERN BOOL  m_bUseStrategicMapping;
 EXTERN BOOL  m_bUseConnexionz;
 

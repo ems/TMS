@@ -497,7 +497,9 @@ BOOL FAR TMSRPT19(TMSRPTPassedDataDef *pPassedData)
 //  Report time
 //
       if(RUNSVIEW[nJ].reportTime > 0)
+      {
         strcat(outputString, chhmm(RUNSVIEW[nJ].reportTime));
+      }
       strcat(outputString, "\t");
 //
 //  Piece number
@@ -543,7 +545,9 @@ BOOL FAR TMSRPT19(TMSRPTPassedDataDef *pPassedData)
 //  Start of next piece
 //
       if(nJ != numPieces - 1)
+      {
         strcat(outputString, Tchar(RUNSVIEW[nJ + 1].runOnTime));
+      }
       strcat(outputString, "\t");
 //
 //  Roster number
@@ -556,10 +560,17 @@ BOOL FAR TMSRPT19(TMSRPTPassedDataDef *pPassedData)
       if(RData[nI].BUSESrecordID != NO_RECORD)
       {
         BUSESKey0.recordID = RData[nI].BUSESrecordID;
-        btrieve(B_GETEQUAL, TMS_BUSES, &BUSES, &BUSESKey0, 0);
-        strncpy(tempString, BUSES.number, BUSES_NUMBER_LENGTH);
-        trim(tempString, BUSES_NUMBER_LENGTH);
-        strcat(outputString, tempString);
+        rcode2 = btrieve(B_GETEQUAL, TMS_BUSES, &BUSES, &BUSESKey0, 0);
+        if(rcode2 != 0)
+        {
+          strcat(outputString, "");
+        }
+        else
+        {
+          strncpy(tempString, BUSES.number, BUSES_NUMBER_LENGTH);
+          trim(tempString, BUSES_NUMBER_LENGTH);
+          strcat(outputString, tempString);
+        }
       }
 //
 //  And one more tab to fill out the record

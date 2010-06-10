@@ -71,6 +71,7 @@ BOOL CAddRoute::OnInitDialog()
 //
   pEditNUMBER = (CEdit *)GetDlgItem(ADDROUTE_NUMBER);
   pEditNAME = (CEdit *)GetDlgItem(ADDROUTE_NAME);
+  pEditALTERNATE = (CEdit *)GetDlgItem(ADDROUTE_ALTERNATE);
   pButtonBIDIRECTIONAL = (CButton *)GetDlgItem(ADDROUTE_BIDIRECTIONAL);
   pButtonCIRCULAR = (CButton *)GetDlgItem(ADDROUTE_CIRCULAR);
   pComboBoxOUTBOUND = (CComboBox *)GetDlgItem(ADDROUTE_OUTBOUND);
@@ -173,6 +174,14 @@ BOOL CAddRoute::OnInitDialog()
     strncpy(tempString, ROUTES.name, ROUTES_NAME_LENGTH);
     trim(tempString, ROUTES_NAME_LENGTH);
     pEditNAME->SetWindowText(tempString);
+//
+//  Alternate number
+//
+    if(ROUTES.alternate > 0)
+    {
+      sprintf(tempString, "%ld", ROUTES.alternate);
+      pEditALTERNATE->SetWindowText(tempString);
+    }
 //
 //  Direction(s)
 //
@@ -493,6 +502,11 @@ void CAddRoute::OnOK()
 //
   strncpy(ROUTES.name, szName, ROUTES_NAME_LENGTH);
   pad(ROUTES.name, ROUTES_NAME_LENGTH);
+//
+//  Alternate Route Number
+//
+  pEditALTERNATE->GetWindowText(tempString, ROUTES_NUMBER_LENGTH);
+  ROUTES.alternate = (strcmp(tempString, "") == 0 ? NO_RECORD : atol(tempString));
 //
 //  Directions
 //

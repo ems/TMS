@@ -243,8 +243,8 @@ BOOL FAR TMSRPT79Ex(TMSRPTPassedDataDef *pPassedData)
     DAILYOPSKey3.DRIVERSrecordID = DriverData[nI].DRIVERSrecordID;
     DAILYOPSKey3.pertainsToDate = fromDate;
     DAILYOPSKey3.pertainsToTime = NO_TIME;
-    DAILYOPSKey3.recordTypeFlag = 0;
-    DAILYOPSKey3.recordFlags = 0;
+    DAILYOPSKey3.recordTypeFlag = NO_RECORD;
+    DAILYOPSKey3.recordFlags = NO_RECORD;
     rcode2 = btrieve(B_GETGREATER, TMS_DAILYOPS, &DAILYOPS, &DAILYOPSKey3, 3);
     while(rcode2 == 0 &&
           DAILYOPS.DRIVERSrecordID == DriverData[nI].DRIVERSrecordID &&

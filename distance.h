@@ -27,24 +27,24 @@ public:
 	static double kmToMiles( const double k )	{ return k * 0.6213712; }
 	static double milesToKM( const double m )	{ return m * (1.0/0.6213712); }
 
-	static double fastRectilinearDistance( double long1, double lat1, double long2, double lat2 )
+	static double fastRectilinearDistance( double lng1, double lat1, double lng2, double lat2 )
 	{
 		// Use a flat plane interpolation to compute distances
 		// (assume that the earth is flat).
 
 		// Make sure the distances have been initialized.
 		if( longitude_1_degree_distance <= 0.0 )
-			initFastDimensions(long1, lat1);
+			initFastDimensions(lng1, lat1);
 
 #ifdef FAST_DISTANCE
-		double dx = (long2 - long1) * longitude_1_degree_distance;
+		double dx = (lng2 - lng1) * longitude_1_degree_distance;
 		if( dx < 0 ) dx = -dx;
-		double dy = (lat2  -  lat1) * latitude_1_degree_distance;
+		double dy = (lat2 - lat1) * latitude_1_degree_distance;
 		if( dy < 0 ) dy = -dy;
 
 		return dx + dy;
 #else
-		return rectilinearGreatCircleDistance( long1, lat1, long2, lat2 );
+		return rectilinearGreatCircleDistance( lng1, lat1, lng2, lat2 );
 #endif
 	}
 
@@ -86,15 +86,15 @@ public:
 		const CompassPoint	cp = compassPoint( x1, y1, x2, y2 );
 		return cp == Directly ? "" : szDirections[cp];
 	}
-	static const char	*compassDirection( double long1, double lat1, double long2, double lat2 )
+	static const char	*compassDirection( double lng1, double lat1, double lng2, double lat2 )
 	{
 		int	x1, y1, x2, y2;
-		CoordFromLongLat( x1, y1, long1, lat1 );
-		CoordFromLongLat( x2, y2, long2, lat2 );
+		CoordFromLongLat( x1, y1, lng1, lat1 );
+		CoordFromLongLat( x2, y2, lng2, lat2 );
 		return compassDirection( x1, y1, x2, y2 );
 	}
 
-	static double fastGreatCircleDistance( double long1, double lat1, double long2, double lat2 )
+	static double fastGreatCircleDistance( double lng1, double lat1, double lng2, double lat2 )
 	{
 #ifdef FAST_DISTANCE
 		// Use a flat plane interpolation to compute distances
@@ -102,23 +102,23 @@ public:
 
 		// Make sure the distances have been initialized.
 		if( longitude_1_degree_distance <= 0.0 )
-			initFastDimensions(long1, lat1);
+			initFastDimensions(lng1, lat1);
 
-		double dx = (long2 - long1) * longitude_1_degree_distance;
-		double dy = (lat2  -  lat1) * latitude_1_degree_distance;
+		double dx = (lng2 - lng1) * longitude_1_degree_distance;
+		double dy = (lat2 - lat1) * latitude_1_degree_distance;
 
 		return sqrt( dx*dx + dy*dy );
 #else
-		return greatCircleDistance( long1, lat1, long2, lat2 );
+		return greatCircleDistance( lng1, lat1, lng2, lat2 );
 #endif
 	}
 
-	static double greatCircleDistance( double long1, double lat1, double long2, double lat2 );
+	static double greatCircleDistance( double lng1, double lat1, double lng2, double lat2 );
 
-	static double rectilinearGreatCircleDistance( double long1, double lat1, double long2, double lat2 )
+	static double rectilinearGreatCircleDistance( double lng1, double lat1, double lng2, double lat2 )
 	{
-		return	greatCircleDistance(long1, lat1, long2, lat1) +
-				greatCircleDistance(long2, lat1, long2, lat2);
+		return	greatCircleDistance(lng1, lat1, lng2, lat1) +
+				greatCircleDistance(lng2, lat1, lng2, lat2);
 	}
 
 	static void resetFastDimensions()

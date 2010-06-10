@@ -60,11 +60,15 @@ BOOL CAddConnection::DisplayActivePattern(CComboBox *pCBRte, CComboBox *pCBSer,
 
   nI = pCBRte->GetCurSel();
   if(nI == CB_ERR)
+  {
     return(FALSE);
+  }
 
   nJ = pCBSer->GetCurSel();
   if(nJ == CB_ERR)
+  {
     return(FALSE);
+  }
 
   routeRecordID = pCBRte->GetItemData(nI);
   serviceRecordID = pCBSer->GetItemData(nJ);
@@ -184,15 +188,14 @@ BOOL CAddConnection::OnInitDialog()
   pButtonTRAVELTIME = (CButton *)GetDlgItem(ADDCONNECTION_TRAVELTIME);
   pButtonDEADHEADTIME = (CButton *)GetDlgItem(ADDCONNECTION_DEADHEADTIME);
   pButtonEQUIV = (CButton *)GetDlgItem(ADDCONNECTION_EQUIV);
+  pButtonAVLEQUIVALENCE = (CButton *)GetDlgItem(ADDCONNECTION_AVLEQUIVALENCE);
   pButtonNA = (CButton *)GetDlgItem(ADDCONNECTION_NA);
   pButtonCC = (CButton *)GetDlgItem(ADDCONNECTION_CC);
   pComboBoxCOMMENTCODE = (CComboBox *)GetDlgItem(ADDCONNECTION_COMMENTCODE);
   pStaticCOUNTER = (CStatic *)GetDlgItem(ADDCONNECTION_COUNTER);
-
 //
 //  Comment codes combo box
 //
-
   numComments = SetUpCommentList(m_hWnd, ADDCONNECTION_COMMENTCODE);
   if(numComments == 0)
   {
@@ -413,9 +416,13 @@ BOOL CAddConnection::OnInitDialog()
 //  1 or 2 way
 //
   if(*m_pUpdateRecordID != NO_RECORD && (CONNECTIONS.flags & CONNECTIONS_FLAG_TWOWAY))
+  {
     pButtonTWOWAY->SetCheck(TRUE);
+  }
   else
+  {
     pButtonONEWAY->SetCheck(TRUE);
+  }
 //
 //  Running, Travel, and Deadhead Time checkboxes,
 //  and From/To Nodes Equivalent checkbox
@@ -423,13 +430,25 @@ BOOL CAddConnection::OnInitDialog()
   if(*m_pUpdateRecordID != NO_RECORD)
   {
     if(CONNECTIONS.flags & CONNECTIONS_FLAG_RUNNINGTIME)
+    {
       pButtonRUNNINGTIME->SetCheck(TRUE);
+    }
     if(CONNECTIONS.flags & CONNECTIONS_FLAG_TRAVELTIME)
+    {
       pButtonTRAVELTIME->SetCheck(TRUE);
+    }
     if(CONNECTIONS.flags & CONNECTIONS_FLAG_DEADHEADTIME)
+    {
       pButtonDEADHEADTIME->SetCheck(TRUE);
+    }
     if(CONNECTIONS.flags & CONNECTIONS_FLAG_EQUIVALENT)
+    {
       pButtonEQUIV->SetCheck(TRUE);
+    }
+    if(CONNECTIONS.flags & CONNECTIONS_FLAG_AVLEQUIVALENT)
+    {
+      pButtonAVLEQUIVALENCE->SetCheck(TRUE);
+    }
   }
   else
   {
@@ -437,6 +456,7 @@ BOOL CAddConnection::OnInitDialog()
     pButtonTRAVELTIME->SetCheck(FALSE);
     pButtonDEADHEADTIME->SetCheck(FALSE);
     pButtonEQUIV->SetCheck(FALSE);
+    pButtonAVLEQUIVALENCE->SetCheck(FALSE);
   }
 //
 //  Comment
@@ -453,9 +473,13 @@ BOOL CAddConnection::OnInitDialog()
       }
     }
     if(bFound)
+    {
       pButtonCC->SetCheck(TRUE);
+    }
     else
+    {
       pButtonNA->SetCheck(TRUE);
+    }
   }
   else
   {
@@ -685,7 +709,9 @@ void CAddConnection::OnOK()
   pEditCONNECTIONTIME->GetWindowText(s);
   connectionTime = atol(s) * 60;
   if(s.Remove('+'))
+  {
     connectionTime += 30;
+  }
   if(connectionTime < 0)
   {
     TMSError(m_hWnd, MB_ICONSTOP, ERROR_027, pEditCONNECTIONTIME->m_hWnd);
@@ -696,7 +722,9 @@ void CAddConnection::OnOK()
 //
   pEditDISTANCE->GetWindowText(s);
   if(s.IsEmpty())
+  {
     distance = NO_RECORD;
+  }
   else
   {
     distance = (float)atof(s);
@@ -753,79 +781,115 @@ void CAddConnection::OnOK()
 //  From Route
 //
   if(pButtonFROMALLROUTES->GetCheck())
+  {
     CONNECTIONS.fromROUTESrecordID = NO_RECORD;
+  }
   else
   {
     nI = pComboBoxFROMROUTE->GetCurSel();
     if(nI == CB_ERR)
+    {
       CONNECTIONS.fromROUTESrecordID = NO_RECORD;
+    }
     else
+    {
       CONNECTIONS.fromROUTESrecordID = pComboBoxFROMROUTE->GetItemData(nI);
+    }
   }
 //
 //  From Service
 //
   if(pButtonFROMALLSERVICES->GetCheck())
+  {
     CONNECTIONS.fromSERVICESrecordID = NO_RECORD;
+  }
   else
   {
     nI = pComboBoxFROMSERVICE->GetCurSel();
     if(nI == CB_ERR)
+    {
       CONNECTIONS.fromSERVICESrecordID = NO_RECORD;
+    }
     else
+    {
       CONNECTIONS.fromSERVICESrecordID = pComboBoxFROMSERVICE->GetItemData(nI);
+    }
   }
 //
 //  From Pattern
 //
   if(pButtonFROMALLPATTERNS->GetCheck())
+  {
     CONNECTIONS.fromPATTERNNAMESrecordID = NO_RECORD;
+  }
   else
   {
     nI = pComboBoxFROMPATTERN->GetCurSel();
     if(nI == CB_ERR)
+    {
       CONNECTIONS.fromPATTERNNAMESrecordID = NO_RECORD;
+    }
     else
+    {
       CONNECTIONS.fromPATTERNNAMESrecordID = pComboBoxFROMPATTERN->GetItemData(nI);
+    }
   }
 //
 //  To Route
 //
   if(pButtonTOALLROUTES->GetCheck())
+  {
     CONNECTIONS.toROUTESrecordID = NO_RECORD;
+  }
   else
   {
     nI = pComboBoxTOROUTE->GetCurSel();
     if(nI == CB_ERR)
+    {
       CONNECTIONS.toROUTESrecordID = NO_RECORD;
+    }
     else
+    {
       CONNECTIONS.toROUTESrecordID = pComboBoxTOROUTE->GetItemData(nI);
+    }
   }
 //
 //  To Service
 //
   if(pButtonTOALLSERVICES->GetCheck())
+  {
     CONNECTIONS.toSERVICESrecordID = NO_RECORD;
+  }
   else
   {
     nI = pComboBoxTOSERVICE->GetCurSel();
     if(nI == CB_ERR)
+    {
       CONNECTIONS.toSERVICESrecordID = NO_RECORD;
+    }
     else
+    {
       CONNECTIONS.toSERVICESrecordID = pComboBoxTOSERVICE->GetItemData(nI);
+    }
   }
 //
 //  To Pattern
 //
   if(pButtonTOALLPATTERNS->GetCheck())
+  {
     CONNECTIONS.toPATTERNNAMESrecordID = NO_RECORD;
+  }
   else
   {
     nI = pComboBoxTOPATTERN->GetCurSel();
     if(nI == CB_ERR)
+    {
       CONNECTIONS.toPATTERNNAMESrecordID = NO_RECORD;
+    }
     else
+    {
       CONNECTIONS.toPATTERNNAMESrecordID = pComboBoxTOPATTERN->GetItemData(nI);
+    }
   }
 //
 //  From time of day
@@ -861,39 +925,62 @@ void CAddConnection::OnOK()
 //  One or Two-Way
 //
   if(pButtonTWOWAY->GetCheck())
+  {
     CONNECTIONS.flags |= CONNECTIONS_FLAG_TWOWAY;
+  }
 //
 //  Running time flag
 //
   if(pButtonRUNNINGTIME->GetCheck())
+  {
     CONNECTIONS.flags |= CONNECTIONS_FLAG_RUNNINGTIME;
+  }
 //
 //  Travel time flag
 //
   if(pButtonTRAVELTIME->GetCheck())
+  {
     CONNECTIONS.flags |= CONNECTIONS_FLAG_TRAVELTIME;
+  }
 //
 //  Deadhead time flag
 //
   if(pButtonDEADHEADTIME->GetCheck())
+  {
     CONNECTIONS.flags |= CONNECTIONS_FLAG_DEADHEADTIME;
+  }
 //
 //  From/To Nodes Equivalent
 //
   if(pButtonEQUIV->GetCheck())
+  {
     CONNECTIONS.flags |= CONNECTIONS_FLAG_EQUIVALENT;
+  }
+//
+//  From/To Nodes AVL Equivalent
+//
+  if(pButtonAVLEQUIVALENCE->GetCheck())
+  {
+    CONNECTIONS.flags |= CONNECTIONS_FLAG_AVLEQUIVALENT;
+  }
 //
 //  Comment
 //
   if(pButtonNA->GetCheck())
+  {
     CONNECTIONS.COMMENTSrecordID = NO_RECORD;
+  }
   else
   {
     nI = pComboBoxCOMMENTCODE->GetCurSel();
     if(nI == CB_ERR)
+    {
       CONNECTIONS.COMMENTSrecordID = NO_RECORD;
+    }
     else
+    {
       CONNECTIONS.COMMENTSrecordID = pComboBoxCOMMENTCODE->GetItemData(nI);
+    }
   }
 //
 //  Forward pointer to ROUTINGS
@@ -935,8 +1022,6 @@ void CAddConnection::OnOK()
           *m_pUpdateRecordID = CONNECTIONS.recordID;
           break;
         }
-//        sprintf(tempString, "Insert/Update failed on Connections Table.  rcode2 was %d", rcode2);
-//        MessageBox(tempString, TMS, MB_OK);
       }
       counter++;
       newRecID = tempCONN.recordID;
@@ -951,11 +1036,15 @@ void CAddConnection::OnOK()
     for(nI = 0; nI < CONN.numConnections; nI++)
     {
       if((bFound = CONN.startRecordID[nI] == CONNECTIONS.recordID) == TRUE)
+      {
         break;
+      }
     }
   }
   if(!bFound)
+  {
     CONN.startRecordID[CONN.numConnections++] = CONNECTIONS.recordID;
+  }
 //
 //  Was "Apply to All" checked?
 //

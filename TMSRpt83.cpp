@@ -40,10 +40,19 @@ BOOL FAR TMSRPT83(TMSRPTPassedDataDef *pPassedData)
 {
   return TMSRpt83Ex(pPassedData);
 }
+
+char  szPayrollCodes[DRIVERS_NUMPAYROLLCODES][DRIVERS_PAYROLLCODE_LENGTH + 1];
+int   today;
+int   rosterWeek;
+int   serviceIndex;
+
+
 } // extern "C"
 
 #include "TMS.h"
 
+extern "C"
+{
 typedef struct OutputStruct
 {
   long payTime;
@@ -66,10 +75,11 @@ typedef struct OutputStruct
 
 BOOL TMSRpt83Crystal(TMSRPTPassedDataDef *, PayrollSelectionsDef *);
 BOOL TMSRpt83File(TMSRPTPassedDataDef *, PayrollSelectionsDef *);
-int  TMSRpt83Operator(long, PayrollSelectionsDef *, OutputDef *, ABSENTDef *, int);
+int  TMSRpt83Operator(long, long, PayrollSelectionsDef *, OutputDef *, ABSENTDef *, int);
 int  TMSRpt83RunDetails(PROPOSEDRUNDef *, COSTDef *, OutputDef *, int);
 
 static long runNumber;
+}
 
 BOOL FAR TMSRpt83Ex(TMSRPTPassedDataDef *pPassedData)
 {
@@ -109,12 +119,6 @@ BOOL FAR TMSRpt83Ex(TMSRPTPassedDataDef *pPassedData)
   return(bFinishedOK);
 }
 
-  char  szPayrollCodes[DRIVERS_NUMPAYROLLCODES][DRIVERS_PAYROLLCODE_LENGTH + 1];
-  long  YYYYMMDD;
-  int   today;
-  int   rosterWeek;
-  int   serviceIndex;
-
 BOOL TMSRpt83Crystal(TMSRPTPassedDataDef *pPD, PayrollSelectionsDef *pPS)
 {
   OutputDef Output[MAX_OUTPUTRECORDS];
@@ -130,6 +134,7 @@ BOOL TMSRpt83Crystal(TMSRPTPassedDataDef *pPD, PayrollSelectionsDef *pPS)
   long  year, month, day;
   long  SERVICESrecordID;
   long  previousSERVICESrecordID;
+  long  YYYYMMDD;
   int   nI, nJ, nK;
   int   rcode2;
   int   seq;
@@ -225,7 +230,7 @@ BOOL TMSRpt83Crystal(TMSRPTPassedDataDef *pPD, PayrollSelectionsDef *pPS)
         continue;
       }
       memset(&Output, 0x00, sizeof(OutputDef) * MAX_OUTPUTRECORDS);
-      numInOutput = TMSRpt83Operator(DRIVERS.recordID, pPS, Output, AbsentList, numAbsent);
+      numInOutput = TMSRpt83Operator(YYYYMMDD, DRIVERS.recordID, pPS, Output, AbsentList, numAbsent);
       if(numInOutput == 0)
       {
         continue;
@@ -693,7 +698,7 @@ BOOL TMSRpt83File(TMSRPTPassedDataDef *pPD, PayrollSelectionsDef *pPS)
 //
 //  See what happened
 //
-      numInOutput = TMSRpt83Operator(DRIVERS.recordID, pPS, Output, AbsentList, numAbsent);
+      numInOutput = TMSRpt83Operator(YYYYMMDD, DRIVERS.recordID, pPS, Output, AbsentList, numAbsent);
       if(numInOutput == 0)
       {
         continue;
@@ -781,6 +786,10 @@ BOOL TMSRpt83File(TMSRPTPassedDataDef *pPD, PayrollSelectionsDef *pPS)
       for(nK = 0; nK < numInOutput; nK++)
       {
         if(nK == dontDump)
+        {
+          continue;
+        }
+        if(Output[nK].szPayCode[0] == NO_RECORD)
         {
           continue;
         }
@@ -912,7 +921,7 @@ void ClearFields()
   PayrollFields.szWorkedDayOff[0] = '\0';
 }
 
-int TMSRpt83Operator(long DRIVERSrecordID, PayrollSelectionsDef* pPS, OutputDef* Output, ABSENTDef *AbsentList, int numAbsent)
+int TMSRpt83Operator(long YYYYMMDD, long DRIVERSrecordID, PayrollSelectionsDef* pPS, OutputDef* Output, ABSENTDef *AbsentList, int numAbsent)
 {
   PROPOSEDRUNDef PROPOSEDRUN;
   COSTDef   COST;
@@ -922,6 +931,7 @@ int TMSRpt83Operator(long DRIVERSrecordID, PayrollSelectionsDef* pPS, OutputDef*
   BOOL  bDoneOne;
   BOOL  bFound;
   BOOL  bCrewOnly;
+  BOOL  bRecostFound;
   long  pieceNumber;
   long  cutAsRuntype;
   long  startTime;
@@ -948,7 +958,7 @@ int TMSRpt83Operator(long DRIVERSrecordID, PayrollSelectionsDef* pPS, OutputDef*
         ROSTER.DRIVERSrecordID == DRIVERSrecordID)
   {
     Output[numInOutput].payTime = 0;
-    strcpy(Output[numInOutput].szPayCode, "");
+    Output[numInOutput].szPayCode[0] = NO_RECORD;
 //
 //  Not rostered
 //
@@ -1074,12 +1084,12 @@ int TMSRpt83Operator(long DRIVERSrecordID, PayrollSelectionsDef* pPS, OutputDef*
 //  Check on a deassign
 //
   DAILYOPSKey3.DRIVERSrecordID = DRIVERSrecordID;
-  DAILYOPSKey3.recordTypeFlag = DAILYOPS_FLAG_OPERATOR;
   DAILYOPSKey3.pertainsToDate = YYYYMMDD;
-  DAILYOPSKey3.pertainsToTime = 0;
-  DAILYOPSKey3.recordFlags = 0;
+  DAILYOPSKey3.pertainsToTime = NO_TIME;
+  DAILYOPSKey3.recordTypeFlag = NO_RECORD;
+  DAILYOPSKey3.recordFlags = NO_RECORD;
   bFound = FALSE;
-  rcode2 = btrieve(B_GETGREATEROREQUAL, TMS_DAILYOPS, &DAILYOPS, &DAILYOPSKey3, 3);
+  rcode2 = btrieve(B_GETGREATER, TMS_DAILYOPS, &DAILYOPS, &DAILYOPSKey3, 3);
   while(rcode2 == 0 &&
         (DAILYOPS.DRIVERSrecordID == DRIVERSrecordID) &&
         (DAILYOPS.recordTypeFlag & DAILYOPS_FLAG_OPERATOR) &&
@@ -1091,6 +1101,7 @@ int TMSRpt83Operator(long DRIVERSrecordID, PayrollSelectionsDef* pPS, OutputDef*
       {
         sprintf(Output[numInOutput].szWorkDay,
               "A Deassign was issued.  Rostered work removed");
+        Output[numInOutput].szPayCode[0] = NO_RECORD;  // Prevent dump of this record to file
         Output[numInOutput].recordType = DAILYOPS_FLAG_OPERATOR;
         Output[numInOutput].recordFlags = DAILYOPS_FLAG_OPERATORDEASSIGN;
         Output[numInOutput].bForcedToWorkDayOff = FALSE;
@@ -1101,6 +1112,7 @@ int TMSRpt83Operator(long DRIVERSrecordID, PayrollSelectionsDef* pPS, OutputDef*
         Output[numInOutput].bTripper = FALSE;
         Output[numInOutput].runNumber = NO_RECORD;
         Output[numInOutput].ROUTESrecordID = NO_RECORD;
+        Output[numInOutput].payTime = 0;
         numInOutput++;
         bFound = TRUE;
         break;
@@ -1126,11 +1138,11 @@ int TMSRpt83Operator(long DRIVERSrecordID, PayrollSelectionsDef* pPS, OutputDef*
 //  Check on overtime (or additional time)
 //
   DAILYOPSKey3.DRIVERSrecordID = DRIVERSrecordID;
-  DAILYOPSKey3.recordTypeFlag = DAILYOPS_FLAG_OPERATOR;
   DAILYOPSKey3.pertainsToDate = YYYYMMDD;
-  DAILYOPSKey3.pertainsToTime = 0;
-  DAILYOPSKey3.recordFlags = 0;
-  rcode2 = btrieve(B_GETGREATEROREQUAL, TMS_DAILYOPS, &DAILYOPS, &DAILYOPSKey3, 3);
+  DAILYOPSKey3.pertainsToTime = NO_TIME;
+  DAILYOPSKey3.recordTypeFlag = NO_RECORD;
+  DAILYOPSKey3.recordFlags = NO_RECORD;
+  rcode2 = btrieve(B_GETGREATER, TMS_DAILYOPS, &DAILYOPS, &DAILYOPSKey3, 3);
   while(rcode2 == 0 &&
         (DAILYOPS.DRIVERSrecordID == DRIVERSrecordID) &&
         (DAILYOPS.recordTypeFlag & DAILYOPS_FLAG_OPERATOR) &&
@@ -1160,6 +1172,7 @@ int TMSRpt83Operator(long DRIVERSrecordID, PayrollSelectionsDef* pPS, OutputDef*
         Output[numInOutput].spreadTime = NO_TIME;
         Output[numInOutput].bTripper = FALSE;
         Output[numInOutput].ROUTESrecordID = NO_RECORD;
+        Output[numInOutput].payTime = DAILYOPS.DOPS.Operator.timeAdjustment;
         numInOutput++;
       }
     }
@@ -1169,17 +1182,16 @@ int TMSRpt83Operator(long DRIVERSrecordID, PayrollSelectionsDef* pPS, OutputDef*
 //  Check on an extra trip
 //
   DAILYOPSKey3.DRIVERSrecordID = DRIVERSrecordID;
-  DAILYOPSKey3.recordTypeFlag = DAILYOPS_FLAG_OPERATOR;
   DAILYOPSKey3.pertainsToDate = YYYYMMDD;
-  DAILYOPSKey3.pertainsToTime = 0;
-  DAILYOPSKey3.recordFlags = 0;
-  rcode2 = btrieve(B_GETGREATEROREQUAL, TMS_DAILYOPS, &DAILYOPS, &DAILYOPSKey3, 3);
+  DAILYOPSKey3.pertainsToTime = NO_TIME;
+  DAILYOPSKey3.recordTypeFlag = NO_RECORD;
+  DAILYOPSKey3.recordFlags = NO_RECORD;
+  rcode2 = btrieve(B_GETGREATER, TMS_DAILYOPS, &DAILYOPS, &DAILYOPSKey3, 3);
   while(rcode2 == 0 &&
         (DAILYOPS.DRIVERSrecordID == DRIVERSrecordID) &&
-        (DAILYOPS.recordTypeFlag & DAILYOPS_FLAG_OPERATOR) &&
         (DAILYOPS.pertainsToDate == YYYYMMDD))
   {
-    if(DAILYOPS.recordFlags & DAILYOPS_FLAG_EXTRATRIP)
+    if((DAILYOPS.recordTypeFlag & DAILYOPS_FLAG_OPERATOR) && (DAILYOPS.recordFlags & DAILYOPS_FLAG_EXTRATRIP))
     {
       if(!ANegatedRecord(DAILYOPS.recordID, 3))
       {
@@ -1207,6 +1219,7 @@ int TMSRpt83Operator(long DRIVERSrecordID, PayrollSelectionsDef* pPS, OutputDef*
         Output[numInOutput].spreadTime = NO_TIME;
         Output[numInOutput].bTripper = TRUE;
         Output[numInOutput].ROUTESrecordID = ROUTES.recordID;
+        Output[numInOutput].payTime = DAILYOPS.DOPS.Operator.timeAdjustment;
         numInOutput++;
       }
     }
@@ -1249,120 +1262,196 @@ int TMSRpt83Operator(long DRIVERSrecordID, PayrollSelectionsDef* pPS, OutputDef*
     Output[numInOutput].spreadTime = NO_TIME;
     Output[numInOutput].bTripper = FALSE;
     Output[numInOutput].ROUTESrecordID = NO_RECORD;
+    Output[numInOutput].runNumber = NO_RECORD;
     numInOutput++;
   }
 //
 //  Check the audit trail for any assignments that have been made for today
 //
+//  DAILYOPSKey1.recordTypeFlag = DAILYOPS_FLAG_OPENWORK;
+//  DAILYOPSKey1.pertainsToDate = YYYYMMDD;
+//  DAILYOPSKey1.pertainsToTime = NO_RECORD;
+//  DAILYOPSKey1.recordFlags = NO_RECORD;
+//  rcode2 = btrieve(B_GETGREATER, TMS_DAILYOPS, &DAILYOPS, &DAILYOPSKey1, 1);
+//  while(rcode2 == 0 &&
+//        (DAILYOPS.recordTypeFlag & DAILYOPS_FLAG_OPENWORK) &&
+//         DAILYOPS.pertainsToDate == YYYYMMDD)
+//  {
+//    if(DAILYOPS.recordFlags & DAILYOPS_FLAG_OPENWORKASSIGN)
+//    {
+//      if(!ANegatedRecord(DAILYOPS.recordID, 1))
+//
+//  Check the audit trail for any assignments that have been made for today
+//
   DAILYOPSKey3.DRIVERSrecordID = DRIVERSrecordID;
-  DAILYOPSKey3.recordTypeFlag = DAILYOPS_FLAG_OPENWORK;
   DAILYOPSKey3.pertainsToDate = YYYYMMDD;
-  DAILYOPSKey3.pertainsToTime = 0;
-  DAILYOPSKey3.recordFlags = 0;
-  rcode2 = btrieve(B_GETGREATEROREQUAL, TMS_DAILYOPS, &DAILYOPS, &DAILYOPSKey3, 3);
+  DAILYOPSKey3.pertainsToTime = NO_TIME;
+  DAILYOPSKey3.recordTypeFlag = NO_RECORD;
+  DAILYOPSKey3.recordFlags = NO_RECORD;
+  rcode2 = btrieve(B_GETGREATER, TMS_DAILYOPS, &DAILYOPS, &DAILYOPSKey3, 3);
   while(rcode2 == 0 &&
          DAILYOPS.DRIVERSrecordID == DRIVERSrecordID &&
-        (DAILYOPS.recordTypeFlag & DAILYOPS_FLAG_OPENWORK) &&
          DAILYOPS.pertainsToDate == YYYYMMDD)
   {
-    if(DAILYOPS.recordFlags & DAILYOPS_FLAG_OPENWORKASSIGN)
+    if((DAILYOPS.recordTypeFlag & DAILYOPS_FLAG_OPENWORK) && (DAILYOPS.recordFlags & DAILYOPS_FLAG_OPENWORKASSIGN))
     {
       if(!ANegatedRecord(DAILYOPS.recordID, 3))
       {
+        bCrewOnly = DAILYOPS.recordFlags & DAILYOPS_FLAG_CREWONLY;
+        RUNSrecordID = DAILYOPS.DOPS.OpenWork.RUNSrecordID;
+        if(bCrewOnly)
+        {
+          CREWONLYKey0.recordID = RUNSrecordID;
+          rcode2 = btrieve(B_GETEQUAL, TMS_CREWONLY, &CREWONLY, &CREWONLYKey0, 0);
+          runNumber = (rcode2 == 0 ? CREWONLY.runNumber : NO_RECORD);
+        }
+        else
+        {
+          RUNSKey0.recordID = RUNSrecordID;
+          rcode2 = btrieve(B_GETEQUAL, TMS_RUNS, &RUNS, &RUNSKey0, 0);
+          runNumber = (rcode2 == 0 ? RUNS.runNumber : NO_RECORD);
+        }
 //
 //  Run splits
 //
         if((DAILYOPS.recordFlags & DAILYOPS_FLAG_RUNSPLITCREWONLY) ||
               (DAILYOPS.recordFlags & DAILYOPS_FLAG_RUNSPLIT))
         {
-          bCrewOnly = DAILYOPS.recordFlags & DAILYOPS_FLAG_CREWONLY;
-          RUNSrecordID = DAILYOPS.DOPS.OpenWork.RUNSrecordID;
           splitStartTime = DAILYOPS.DOPS.OpenWork.splitStartTime;
           splitEndTime = DAILYOPS.DOPS.OpenWork.splitEndTime;
           splitStartNODESrecordID = DAILYOPS.DOPS.OpenWork.splitStartNODESrecordID;
           splitEndNODESrecordID = DAILYOPS.DOPS.OpenWork.splitEndNODESrecordID;
           btrieve(B_GETPOSITION, TMS_DAILYOPS, &absRecID, &DAILYOPSKey3, 3);
+//          btrieve(B_GETPOSITION, TMS_DAILYOPS, &absRecID, &DAILYOPSKey1, 1);
 //
 //  See if the split was recosted
 //
+          bRecostFound = FALSE;
           DAILYOPSKey1.recordTypeFlag = DAILYOPS_FLAG_OPENWORK;
           DAILYOPSKey1.pertainsToDate = YYYYMMDD;
           DAILYOPSKey1.pertainsToTime = 999999;
-          DAILYOPSKey1.recordFlags = DAILYOPS_FLAG_RECOSTRUN;
+          DAILYOPSKey1.recordFlags = 999999;
           rcode2 = btrieve(B_GETLESSTHAN, TMS_DAILYOPS, &DAILYOPS, &DAILYOPSKey1, 1);
           while(rcode2 == 0 &&
                 DAILYOPS.recordTypeFlag == DAILYOPS_FLAG_OPENWORK &&
-               (DAILYOPS.recordFlags & DAILYOPS_FLAG_RECOSTRUN) &&
                 DAILYOPS.pertainsToDate == YYYYMMDD)
           {
-            if(DAILYOPS.DAILYOPSrecordID == NO_RECORD && DAILYOPS.DRIVERSrecordID == DRIVERSrecordID)
+            if(DAILYOPS.recordFlags & DAILYOPS_FLAG_RECOSTRUN)
             {
-              if((bCrewOnly && (DAILYOPS.recordFlags & DAILYOPS_FLAG_CREWONLY)) ||
-                    (!bCrewOnly && !(DAILYOPS.recordFlags & DAILYOPS_FLAG_CREWONLY)))
+              if(DAILYOPS.DAILYOPSrecordID == NO_RECORD)
               {
-                if(DAILYOPS.DOPS.OpenWork.RUNSrecordID == RUNSrecordID &&
-                      DAILYOPS.DOPS.OpenWork.splitStartTime == splitStartTime &&
-                      DAILYOPS.DOPS.OpenWork.splitStartNODESrecordID == splitStartNODESrecordID &&
-                      DAILYOPS.DOPS.OpenWork.splitEndTime == splitEndTime &&
-                      DAILYOPS.DOPS.OpenWork.splitEndNODESrecordID == splitEndNODESrecordID)
-
+                if((bCrewOnly && (DAILYOPS.recordFlags & DAILYOPS_FLAG_CREWONLY)) ||
+                      (!bCrewOnly && !(DAILYOPS.recordFlags & DAILYOPS_FLAG_CREWONLY)))
                 {
-                  Output[numInOutput].payTime = DAILYOPS.DOPS.OpenWork.payTime;
-                  if(bCrewOnly)
+                  if(DAILYOPS.DOPS.OpenWork.RUNSrecordID == RUNSrecordID &&
+                        DAILYOPS.DOPS.OpenWork.splitStartTime == splitStartTime &&
+                        DAILYOPS.DOPS.OpenWork.splitStartNODESrecordID == splitStartNODESrecordID &&
+                        DAILYOPS.DOPS.OpenWork.splitEndTime == splitEndTime &&
+                        DAILYOPS.DOPS.OpenWork.splitEndNODESrecordID == splitEndNODESrecordID)
                   {
-                    sprintf(Output[numInOutput].szWorkDay,
-                          "Assigned to crew-only run %ld, paying %s", runNumber, chhmm(DAILYOPS.DOPS.OpenWork.payTime));
+                    bRecostFound = TRUE;
+                    Output[numInOutput].payTime = DAILYOPS.DOPS.OpenWork.payTime;
+                    if(bCrewOnly)
+                    {
+                      sprintf(Output[numInOutput].szWorkDay,
+                            "Assigned to portion of crew-only run %ld, paying %s", runNumber, chhmm(DAILYOPS.DOPS.OpenWork.payTime));
+                    }
+                    else
+                    {
+                      sprintf(Output[numInOutput].szWorkDay,
+                             "Assigned to portion of run %ld, paying %s", runNumber, chhmm(DAILYOPS.DOPS.OpenWork.payTime));
+                    }
+                    Output[numInOutput].recordType = DAILYOPS_FLAG_OPENWORK;
+                    Output[numInOutput].recordFlags = 0;
+                    if(pPS->flags & PAYROLLSELECTIONS_FLAG_CODES)
+                    {
+                      strcpy(Output[numInOutput].szPayCode, szPayrollCodes[DRIVERTYPES_PAYROLLCODE_REGULAR]);
+                    }
+                    else
+                    {
+                      strcpy(Output[numInOutput].szPayCode, "");
+                    }
+                    Output[numInOutput].bForcedToWorkDayOff = FALSE;
+                    Output[numInOutput].checkinTime = splitStartTime;
+                    Output[numInOutput].checkoutTime = splitEndTime;
+                    Output[numInOutput].platformTime = splitEndTime - splitStartTime;
+                    Output[numInOutput].spreadTime = NO_TIME;
+                    Output[numInOutput].bTripper = TRUE;
+                    Output[numInOutput].runNumber = runNumber;
+                    if(bCrewOnly)
+                    {
+                      Output[numInOutput].ROUTESrecordID = NO_RECORD;
+                    }
+                    else
+                    {
+                      RUNSKey0.recordID = RUNSrecordID;
+                      rcode2 = btrieve(B_GETEQUAL, TMS_RUNS, &RUNS, &RUNSKey0, 0);
+                      TRIPSKey0.recordID = RUNS.start.TRIPSrecordID;
+                      rcode2 = btrieve(B_GETEQUAL, TMS_ROUTES, &ROUTES, &ROUTESKey0, 0);
+                      Output[numInOutput].ROUTESrecordID = TRIPS.ROUTESrecordID;
+                    }
+                    numInOutput++;
+                    break;
                   }
-                  else
-                  {
-                    sprintf(Output[numInOutput].szWorkDay,
-                           "Assigned to run %ld, paying %s", runNumber, chhmm(DAILYOPS.DOPS.OpenWork.payTime));
-                  }
-                  Output[numInOutput].recordType = DAILYOPS_FLAG_OPENWORK;
-                  Output[numInOutput].recordFlags = 0;
-                  if(pPS->flags & PAYROLLSELECTIONS_FLAG_CODES)
-                  {
-                    strcpy(Output[numInOutput].szPayCode, szPayrollCodes[DRIVERTYPES_PAYROLLCODE_REGULAR]);
-                  }
-                  else
-                  {
-                    strcpy(Output[numInOutput].szPayCode, "");
-                  }
-                  Output[numInOutput].bForcedToWorkDayOff = FALSE;
-                  Output[numInOutput].checkinTime = splitStartTime;
-                  Output[numInOutput].checkoutTime = splitEndTime;
-                  Output[numInOutput].platformTime = splitEndTime - splitStartTime;
-                  Output[numInOutput].spreadTime = NO_TIME;
-                  Output[numInOutput].bTripper = TRUE;
-                  Output[numInOutput].runNumber = runNumber;
-                  if(bCrewOnly)
-                  {
-                    Output[numInOutput].ROUTESrecordID = NO_RECORD;
-                  }
-                  else
-                  {
-                    RUNSKey0.recordID = RUNSrecordID;
-                    rcode2 = btrieve(B_GETEQUAL, TMS_RUNS, &RUNS, &RUNSKey0, 0);
-                    TRIPSKey0.recordID = RUNS.start.TRIPSrecordID;
-                    rcode2 = btrieve(B_GETEQUAL, TMS_ROUTES, &ROUTES, &ROUTESKey0, 0);
-                    Output[numInOutput].ROUTESrecordID = TRIPS.ROUTESrecordID;
-                  }
-                  numInOutput++;
-                  break;
                 }
               }
             }
             rcode2 = btrieve(B_GETPREVIOUS, TMS_DAILYOPS, &DAILYOPS, &DAILYOPSKey1, 1);
           }
+          if(!bRecostFound)
+          {
+            Output[numInOutput].payTime = 0;
+            if(bCrewOnly)
+            {
+              sprintf(Output[numInOutput].szWorkDay,
+                    "Assigned to portion of crew-only run %ld: *** Not recosted ***", runNumber);
+            }
+            else
+            {
+              sprintf(Output[numInOutput].szWorkDay,
+                    "Assigned to portion of run %ld: *** Not recosted ***", runNumber);
+            }
+            Output[numInOutput].recordType = DAILYOPS_FLAG_OPENWORK;
+            Output[numInOutput].recordFlags = 0;
+            if(pPS->flags & PAYROLLSELECTIONS_FLAG_CODES)
+            {
+              strcpy(Output[numInOutput].szPayCode, szPayrollCodes[DRIVERTYPES_PAYROLLCODE_REGULAR]);
+            }
+            else
+            {
+              strcpy(Output[numInOutput].szPayCode, "");
+            }
+            Output[numInOutput].bForcedToWorkDayOff = FALSE;
+            Output[numInOutput].checkinTime = splitStartTime;
+            Output[numInOutput].checkoutTime = splitEndTime;
+            Output[numInOutput].platformTime = splitEndTime - splitStartTime;
+            Output[numInOutput].spreadTime = NO_TIME;
+            Output[numInOutput].bTripper = TRUE;
+            Output[numInOutput].runNumber = runNumber;
+            if(bCrewOnly)
+            {
+              Output[numInOutput].ROUTESrecordID = NO_RECORD;
+            }
+            else
+            {
+              RUNSKey0.recordID = RUNSrecordID;
+              rcode2 = btrieve(B_GETEQUAL, TMS_RUNS, &RUNS, &RUNSKey0, 0);
+              TRIPSKey0.recordID = RUNS.start.TRIPSrecordID;
+              rcode2 = btrieve(B_GETEQUAL, TMS_ROUTES, &ROUTES, &ROUTESKey0, 0);
+              Output[numInOutput].ROUTESrecordID = TRIPS.ROUTESrecordID;
+            }
+            numInOutput++;
+          }
           DAILYOPS.recordID = absRecID;
           btrieve(B_GETDIRECT, TMS_DAILYOPS, &DAILYOPS, &DAILYOPSKey3, 3);
+//          btrieve(B_GETDIRECT, TMS_DAILYOPS, &DAILYOPS, &DAILYOPSKey1, 1);
         }
 //
 //  Whole runs
 //
         else
         {
-          bCrewOnly = DAILYOPS.recordFlags & DAILYOPS_FLAG_CREWONLY;
+//          bCrewOnly = DAILYOPS.recordFlags & DAILYOPS_FLAG_CREWONLY;
           cutAsRuntype = CDailyOps::SetupRun(DAILYOPS.DOPS.OpenWork.RUNSrecordID, bCrewOnly, &PROPOSEDRUN);
           numPieces = PROPOSEDRUN.numPieces;
           RunCoster(&PROPOSEDRUN, cutAsRuntype, &COST);
@@ -1389,7 +1478,7 @@ int TMSRpt83Operator(long DRIVERSrecordID, PayrollSelectionsDef* pPS, OutputDef*
           }
           Output[numInOutput].bForcedToWorkDayOff = FALSE;
           Output[numInOutput].checkinTime = PROPOSEDRUN.piece[0].fromTime;
-          Output[numInOutput].checkoutTime = PROPOSEDRUN.piece[pieceNumber - 1].toTime;
+          Output[numInOutput].checkoutTime = PROPOSEDRUN.piece[numPieces - 1].toTime;
           Output[numInOutput].platformTime = COST.TOTAL.platformTime;
           Output[numInOutput].spreadTime = COST.spreadTime;
           Output[numInOutput].bTripper = (COST.TOTAL.payTime < 60 * 60 * 7);
@@ -1407,10 +1496,19 @@ int TMSRpt83Operator(long DRIVERSrecordID, PayrollSelectionsDef* pPS, OutputDef*
             Output[numInOutput].ROUTESrecordID = TRIPS.ROUTESrecordID;
           }
           numInOutput++;
+//
+//  Dump out the run details, if requested
+//
+          if(pPS->flags & PAYROLLSELECTIONS_FLAG_SHOWRUNDETAILS)
+          {
+            numInOutput = TMSRpt83RunDetails(&PROPOSEDRUN, &COST, Output, numInOutput);
+          }
         }
       }
     }
-    rcode2 = btrieve(B_GETPREVIOUS, TMS_DAILYOPS, &DAILYOPS, &DAILYOPSKey1, 1);
+//    rcode2 = btrieve(B_GETPREVIOUS, TMS_DAILYOPS, &DAILYOPS, &DAILYOPSKey1, 1);
+//    rcode2 = btrieve(B_GETNEXT, TMS_DAILYOPS, &DAILYOPS, &DAILYOPSKey1, 1);             
+    rcode2 = btrieve(B_GETNEXT, TMS_DAILYOPS, &DAILYOPS, &DAILYOPSKey3, 3);             
   }
   
   return(numInOutput);
@@ -1470,15 +1568,22 @@ int TMSRpt83RunDetails(PROPOSEDRUNDef *pPROPOSEDRUN, COSTDef *pCOST, OutputDef *
 //
 //  Block Number
 //
-    TRIPSKey0.recordID = pPROPOSEDRUN->piece[nI].fromTRIPSrecordID;
-    btrieve(B_GETEQUAL, TMS_TRIPS, &TRIPS, &TRIPSKey0, 0);
-    if(TRIPS.standard.blockNumber <= 0)
+    if(pPROPOSEDRUN->piece[nI].fromTRIPSrecordID == NO_RECORD)
     {
       strcpy(pOutput[pos].szWorkDay, "       ");
     }
     else
     {
-      sprintf(pOutput[pos].szWorkDay, "%5ld  ", TRIPS.standard.blockNumber);
+      TRIPSKey0.recordID = pPROPOSEDRUN->piece[nI].fromTRIPSrecordID;
+      btrieve(B_GETEQUAL, TMS_TRIPS, &TRIPS, &TRIPSKey0, 0);
+      if(TRIPS.standard.blockNumber <= 0)
+      {
+        strcpy(pOutput[pos].szWorkDay, "       ");
+      }
+      else
+      {
+        sprintf(pOutput[pos].szWorkDay, "%5ld  ", TRIPS.standard.blockNumber);
+      }
     }
 
 //

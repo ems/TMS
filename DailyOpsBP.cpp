@@ -18,12 +18,11 @@ static char THIS_FILE[] = __FILE__;
 /////////////////////////////////////////////////////////////////////////////
 // CDailyOpsBP dialog
 
-
-CDailyOpsBP::CDailyOpsBP(CWnd* pParent, BlockInfoDef* pBlockInfo, CTime DailyOpsDate)   // standard constructor
+CDailyOpsBP::CDailyOpsBP(CWnd* pParent, TripInfoDef* pTI, int numInTripInfo)   // standard constructor
 	: CDialog(CDailyOpsBP::IDD, pParent)
 {
-  m_pBlockInfo = pBlockInfo;
-  m_DailyOpsDate = DailyOpsDate;
+  m_pTI = pTI;
+  m_numInTI = numInTripInfo;
 
 	//{{AFX_DATA_INIT(CDailyOpsBP)
 		// NOTE: the ClassWizard will add member initialization here
@@ -72,7 +71,10 @@ BOOL CDailyOpsBP::OnInitDialog()
   CString sRGRP;
   CString sSGRP;
 
-  ROUTESKey0.recordID = m_pBlockInfo->RGRPROUTESrecordID;
+  TRIPSKey0.recordID = m_pTI->TRIPSrecordID;
+  btrieve(B_GETEQUAL, TMS_TRIPS, &TRIPS, &TRIPSKey0, 0);
+
+  ROUTESKey0.recordID = TRIPS.standard.RGRPROUTESrecordID;
   btrieve(B_GETEQUAL, TMS_ROUTES, &ROUTES, &ROUTESKey0, 0);
   strncpy(tempString, ROUTES.number, ROUTES_NUMBER_LENGTH);
   trim(tempString, ROUTES_NUMBER_LENGTH);
@@ -82,14 +84,14 @@ BOOL CDailyOpsBP::OnInitDialog()
   trim(tempString, ROUTES_NAME_LENGTH);
   sRGRP += tempString;
 
-  SERVICESKey0.recordID = m_pBlockInfo->SGRPSERVICESrecordID;
+  SERVICESKey0.recordID = TRIPS.standard.SGRPSERVICESrecordID;
   btrieve(B_GETEQUAL, TMS_SERVICES, &SERVICES, &SERVICESKey0, 0);
   strncpy(tempString, SERVICES.name, SERVICES_NAME_LENGTH);
   trim(tempString, SERVICES_NAME_LENGTH);
   sSGRP = tempString;
 
   sprintf(tempString, "Block number %ld Properties : Blocked on RGRP %s, SGRP %s",
-        m_pBlockInfo->blockNumber, sRGRP, sSGRP);
+        TRIPS.standard.blockNumber, sRGRP, sSGRP);
   SetWindowText(tempString);
 //
 //  Set the headers and columns on the list control
@@ -183,276 +185,11 @@ BOOL CDailyOpsBP::OnInitDialog()
   LVC.pszText = "PIT";
   pListCtrlTRIPLIST->InsertColumn(16, &LVC);
 //
-// Figure out the service day
-//
-  int  today;
-  char szHolidayName[DAILYOPS_DATENAME_LENGTH + 1];
-  long yyyy = m_DailyOpsDate.GetYear();
-  long mm   = m_DailyOpsDate.GetMonth();
-  long dd   = m_DailyOpsDate.GetDay();
-  long dateToUse = (yyyy * 10000) + (mm * 100) + dd;
-  long SERVICESrecordID = CDailyOps::DetermineServiceDay(dateToUse, FALSE, &today, szHolidayName);
-//
-//  Build the m_TripInfo structure
-//
-  int keyNumber = 2;
-
-  TRIPSKey0.recordID = m_pBlockInfo->TRIPSrecordID;
-  btrieve(B_GETEQUAL, TMS_TRIPS, &TRIPS, &TRIPSKey0, 0);
-
-  GenerateTripDef GTResults;
-  BLOCKSDef *pTRIPSChunk = keyNumber == 2 ? &TRIPS.standard : &TRIPS.dropback;
-  long startTRIPSrecordID = NO_RECORD;
-  long endTRIPSrecordID = NO_RECORD;
-  long previousRunNumber = NO_RECORD;
-  long previousRosterNumber = NO_RECORD;
-  long RUNSrecordID;
-  long runNumber;
-  char *ptr = NULL;
-  long assignedToNODESrecordID = TRIPS.standard.assignedToNODESrecordID;
-  long reliefAtNODESrecordID;
-  long patternIndex;
-  BOOL bFound;
-  BOOL bCrewOnly;
-  int  rcode2;
-  int  nI;
-
-  m_numInTripInfo = 0;
-  TRIPSKey2.assignedToNODESrecordID = assignedToNODESrecordID;
-  TRIPSKey2.RGRPROUTESrecordID = m_pBlockInfo->RGRPROUTESrecordID;
-  TRIPSKey2.SGRPSERVICESrecordID = m_pBlockInfo->SGRPSERVICESrecordID;
-  TRIPSKey2.blockNumber = m_pBlockInfo->blockNumber;
-  TRIPSKey2.blockSequence = NO_RECORD;
-  rcode2 = btrieve(B_GETGREATER, TMS_TRIPS, &TRIPS, &TRIPSKey2, keyNumber);
-  while(rcode2 == 0 &&
-        pTRIPSChunk->assignedToNODESrecordID == assignedToNODESrecordID &&
-        pTRIPSChunk->RGRPROUTESrecordID == m_pBlockInfo->RGRPROUTESrecordID &&
-        pTRIPSChunk->SGRPSERVICESrecordID == m_pBlockInfo->SGRPSERVICESrecordID &&
-        pTRIPSChunk->blockNumber == m_pBlockInfo->blockNumber)
-  {
-    GenerateTrip(TRIPS.ROUTESrecordID, TRIPS.SERVICESrecordID,
-          TRIPS.directionIndex, TRIPS.PATTERNNAMESrecordID,
-          TRIPS.timeAtMLP, GENERATETRIP_FLAG_DISPLAYERRORS, &GTResults);
-
-    reliefAtNODESrecordID = NO_RECORD;
-//
-//  TRIPSrecordID
-//
-    m_TripInfo[m_numInTripInfo].TRIPSrecordID = TRIPS.recordID;
-//
-//  Trip number
-//
-    m_TripInfo[m_numInTripInfo].tripNumber = TRIPS.tripNumber;
-//
-//  Status
-//
-    m_TripInfo[m_numInTripInfo].flags = TRIPINFO_FLAG_OK;
-//
-//  Run number
-//
-//  If need be, locate the trip in the Runs Table
-//
-    for(nI = 0; nI < MAXRELIEFSPERTRIP; nI++)
-    {
-      m_TripInfo[m_numInTripInfo].runNumber[nI] = NO_RECORD;
-    }
-    reliefAtNODESrecordID = NO_RECORD;
-    bFound = FALSE;
-    if(startTRIPSrecordID == NO_RECORD || TRIPS.recordID == endTRIPSrecordID)
-    {
-      RUNSKey1.DIVISIONSrecordID = m_DailyOpsRUNSDivisionInEffect;
-      RUNSKey1.SERVICESrecordID = m_pBlockInfo->SGRPSERVICESrecordID;
-      RUNSKey1.runNumber = NO_RECORD;
-      RUNSKey1.pieceNumber = NO_RECORD;
-      rcode2 = btrieve(B_GETGREATER, TMS_RUNS, &RUNS, &RUNSKey1, 1);
-      while(rcode2 == 0 &&
-            RUNS.DIVISIONSrecordID == m_DailyOpsRUNSDivisionInEffect &&
-            RUNS.SERVICESrecordID == m_pBlockInfo->SGRPSERVICESrecordID)
-      {
-        if(RUNS.start.TRIPSrecordID == TRIPS.recordID)
-        {
-          startTRIPSrecordID = RUNS.start.TRIPSrecordID;
-          endTRIPSrecordID = RUNS.end.TRIPSrecordID;
-          bFound = TRUE;
-          break;
-        }
-        rcode2 = btrieve(B_GETNEXT, TMS_RUNS, &RUNS, &RUNSKey1, 1);
-      }
-    }
-    if(bFound)
-    {
-      RUNSrecordID = RUNS.recordID;
-      runNumber = RUNS.runNumber;
-      if(previousRunNumber != NO_RECORD)
-      {
-        m_TripInfo[m_numInTripInfo].runNumber[0] = previousRunNumber;
-        m_TripInfo[m_numInTripInfo].runNumber[1] = RUNS.runNumber;
-        reliefAtNODESrecordID = RUNS.start.NODESrecordID;
-      }
-      else
-      {
-        m_TripInfo[m_numInTripInfo].runNumber[0] = RUNS.runNumber;
-      }
-      previousRunNumber = RUNS.runNumber;
-    }
-    else
-    {
-      m_TripInfo[m_numInTripInfo].runNumber[0] = previousRunNumber;
-    }
-//
-//  Roster number
-//
-    m_TripInfo[m_numInTripInfo].rosterNumber[0] = NO_RECORD;
-    m_TripInfo[m_numInTripInfo].rosterNumber[1] = NO_RECORD;
-    if(bFound)
-    {
-      if(previousRosterNumber != NO_RECORD)
-      {
-        m_TripInfo[m_numInTripInfo].rosterNumber[0] = previousRosterNumber;
-      }
-      ROSTERKey1.DIVISIONSrecordID = m_DailyOpsROSTERDivisionInEffect;
-      ROSTERKey1.rosterNumber = NO_RECORD;
-      rcode2 = btrieve(B_GETGREATER, TMS_ROSTER, &ROSTER, &ROSTERKey1, 1);
-      while(rcode2 == 0 &&
-            ROSTER.DIVISIONSrecordID == m_DailyOpsROSTERDivisionInEffect)
-      {
-        bCrewOnly = (ROSTER.WEEK[m_RosterWeek].flags & (1 << today));
-        if(!bCrewOnly)
-        {
-          RUNSKey0.recordID = ROSTER.WEEK[m_RosterWeek].RUNSrecordIDs[today];
-          rcode2 = btrieve(B_GETEQUAL, TMS_RUNS, &RUNS, &RUNSKey0, 0);
-          if(rcode2 == 0 && RUNS.runNumber == runNumber)
-          {
-            if(ROSTER.rosterNumber != previousRosterNumber && previousRosterNumber != NO_RECORD)
-            {
-              m_TripInfo[m_numInTripInfo].rosterNumber[0] = previousRosterNumber;
-              m_TripInfo[m_numInTripInfo].rosterNumber[1] = ROSTER.rosterNumber;
-            }
-            else
-            {
-              m_TripInfo[m_numInTripInfo].rosterNumber[0] = ROSTER.rosterNumber;
-            }
-            previousRosterNumber = ROSTER.rosterNumber;
-            break;
-          }
-        }
-        rcode2 = btrieve(B_GETNEXT, TMS_ROSTER, &ROSTER, &ROSTERKey1, 1);
-      }
-    }
-    else
-    {
-      m_TripInfo[m_numInTripInfo].rosterNumber[0] = previousRosterNumber;
-    }
-//
-//  Operator
-//
-    for(nI = 0; nI < 2; nI++)
-    {
-      m_TripInfo[m_numInTripInfo].DRIVERSrecordID[nI] = NO_RECORD;
-      if(m_TripInfo[m_numInTripInfo].rosterNumber[nI] == NO_RECORD)
-      {
-        continue;
-      }
-      ROSTERKey1.DIVISIONSrecordID = m_DailyOpsROSTERDivisionInEffect;
-      ROSTERKey1.rosterNumber = m_TripInfo[m_numInTripInfo].rosterNumber[nI];
-      rcode2 = btrieve(B_GETEQUAL, TMS_ROSTER, &ROSTER, &ROSTERKey1, 1);
-      if(rcode2 == 0)
-      {
-        m_TripInfo[m_numInTripInfo].DRIVERSrecordID[nI] = ROSTER.DRIVERSrecordID;
-      }
-    }
-//
-//  Relief information
-//
-//  Relief At
-//
-    m_TripInfo[m_numInTripInfo].reliefAtNODESrecordID = reliefAtNODESrecordID;
-    m_TripInfo[m_numInTripInfo].reliefAtTime = NO_TIME;
-    if(reliefAtNODESrecordID != NO_RECORD)
-    {
-//
-//  Relief time
-//
-//  Find the node on the pattern
-//
-      strcpy(tempString, "");
-      patternIndex = 0;
-      PATTERNSKey2.ROUTESrecordID = TRIPS.ROUTESrecordID;
-      PATTERNSKey2.SERVICESrecordID = TRIPS.SERVICESrecordID;
-      PATTERNSKey2.PATTERNNAMESrecordID = TRIPS.PATTERNNAMESrecordID;
-      PATTERNSKey2.directionIndex = TRIPS.directionIndex;
-      PATTERNSKey2.nodeSequence = NO_RECORD;
-      rcode2 = btrieve(B_GETGREATER, TMS_PATTERNS, &PATTERNS, &PATTERNSKey2, 2);
-      while(rcode2 == 0 &&
-            PATTERNS.ROUTESrecordID == TRIPS.ROUTESrecordID &&
-            PATTERNS.SERVICESrecordID == TRIPS.SERVICESrecordID &&
-            PATTERNS.PATTERNNAMESrecordID == TRIPS.PATTERNNAMESrecordID &&
-            PATTERNS.directionIndex == TRIPS.directionIndex)
-      {
-        if(!(PATTERNS.flags & PATTERNS_FLAG_BUSSTOP))
-        {
-          if(PATTERNS.NODESrecordID == reliefAtNODESrecordID)
-          {
-            m_TripInfo[m_numInTripInfo].reliefAtTime = GTResults.tripTimes[patternIndex];
-            break;
-          }
-          patternIndex++;
-        }
-        rcode2 = btrieve(B_GETNEXT, TMS_PATTERNS, &PATTERNS, &PATTERNSKey2, 2);
-      }
-    }
-//
-//  POG and POT
-//
-    m_TripInfo[m_numInTripInfo].POGNODESrecordID = pTRIPSChunk->POGNODESrecordID;
-    m_TripInfo[m_numInTripInfo].POTime = NO_TIME;
-    if(pTRIPSChunk->POGNODESrecordID != NO_RECORD)
-    {
-      m_TripInfo[m_numInTripInfo].POTime = m_pBlockInfo->POTime;
-    }
-//
-//  Route
-//
-    m_TripInfo[m_numInTripInfo].ROUTESrecordID = TRIPS.ROUTESrecordID;
-//
-//  Pattern
-//
-    m_TripInfo[m_numInTripInfo].PATTERNNAMESrecordID = TRIPS.PATTERNNAMESrecordID;
-//
-//  FNode
-//
-    m_TripInfo[m_numInTripInfo].fromNODESrecordID = GTResults.firstNODESrecordID;
-//
-//  FTime
-//
-    m_TripInfo[m_numInTripInfo].fromTime = GTResults.firstNodeTime;
-//
-//  TTime
-//
-    m_TripInfo[m_numInTripInfo].toTime = GTResults.lastNodeTime;
-//
-//  TNode
-//
-    m_TripInfo[m_numInTripInfo].toNODESrecordID = GTResults.lastNODESrecordID;
-//
-//  PIG and PIT
-//
-    m_TripInfo[m_numInTripInfo].PIGNODESrecordID = pTRIPSChunk->PIGNODESrecordID;
-    m_TripInfo[m_numInTripInfo].PITime = NO_TIME;
-    if(pTRIPSChunk->PIGNODESrecordID != NO_RECORD)
-    {
-      m_TripInfo[m_numInTripInfo].PITime = m_pBlockInfo->PITime;
-    }
-//
-//  Get the next record
-//
-    m_numInTripInfo++;
-    rcode2 = btrieve(B_GETNEXT, TMS_TRIPS, &TRIPS, &TRIPSKey2, keyNumber);
-  }
-//
 //  Display the structure
 //
-  for(nI = 0; nI < m_numInTripInfo; nI++)
+  int nI;
+
+  for(nI = 0; nI < m_numInTI; nI++)
   {
     DisplayRow(nI);
   }
@@ -469,9 +206,9 @@ void CDailyOpsBP::DisplayRow(int rowNumber)
 //
 //  Trip number
 //
-  if(m_TripInfo[rowNumber].tripNumber > 0)
+  if(m_pTI[rowNumber].tripNumber > 0)
   {
-    sprintf(tempString, "%ld", m_TripInfo[rowNumber].tripNumber);
+    sprintf(tempString, "%ld", m_pTI[rowNumber].tripNumber);
   }
   else
   {
@@ -486,23 +223,23 @@ void CDailyOpsBP::DisplayRow(int rowNumber)
 //
 //  Status
 //
-  if(m_TripInfo[rowNumber].flags & TRIPINFO_FLAG_OK)
+  if(m_pTI[rowNumber].flags & TRIPINFO_FLAG_OK)
   {
     strcpy(tempString, "OK");
   }
-  else if(m_TripInfo[rowNumber].flags & TRIPINFO_FLAG_LATELEAVING)
+  else if(m_pTI[rowNumber].flags & TRIPINFO_FLAG_LATELEAVING)
   {
     strcpy(tempString, "Late dep");
   }
-  else if(m_TripInfo[rowNumber].flags & TRIPINFO_FLAG_LATEARRIVING)
+  else if(m_pTI[rowNumber].flags & TRIPINFO_FLAG_LATEARRIVING)
   {
     strcpy(tempString, "Late arr");
   }
-  else if(m_TripInfo[rowNumber].flags & TRIPINFO_FLAG_DROPPED)
+  else if(m_pTI[rowNumber].flags & TRIPINFO_FLAG_DROPPED)
   {
     strcpy(tempString, "Dropped");
   }
-  else if(m_TripInfo[rowNumber].flags & TRIPINFO_FLAG_REPATTERNED)
+  else if(m_pTI[rowNumber].flags & TRIPINFO_FLAG_REPATTERNED)
   {
     strcpy(tempString, "Repatterned");
   }
@@ -514,13 +251,13 @@ void CDailyOpsBP::DisplayRow(int rowNumber)
 //
 //  Run number
 //
-  if(m_TripInfo[rowNumber].runNumber[1] == NO_RECORD)
+  if(m_pTI[rowNumber].runNumber[1] == NO_RECORD)
   {
-    sprintf(tempString, "%ld", m_TripInfo[rowNumber].runNumber[0]);
+    sprintf(tempString, "%ld", m_pTI[rowNumber].runNumber[0]);
   }
   else
   {
-    sprintf(tempString, "%ld/%ld", m_TripInfo[rowNumber].runNumber[0], m_TripInfo[rowNumber].runNumber[1]);
+    sprintf(tempString, "%ld/%ld", m_pTI[rowNumber].runNumber[0], m_pTI[rowNumber].runNumber[1]);
   }
   LVI.mask = LVIF_TEXT;
   LVI.iItem = rowNumber;
@@ -532,16 +269,16 @@ void CDailyOpsBP::DisplayRow(int rowNumber)
 //
   for(nI = 0; nI < 2; nI++)
   {
-    if(m_TripInfo[rowNumber].rosterNumber[nI] == NO_RECORD)
+    if(m_pTI[rowNumber].rosterNumber[nI] == NO_RECORD)
     {
       strcpy(szRosterNumber[nI], "-");
     }
     else
     {
-      sprintf(szRosterNumber[nI], "%ld", m_TripInfo[rowNumber].rosterNumber[nI]);
+      sprintf(szRosterNumber[nI], "%ld", m_pTI[rowNumber].rosterNumber[nI]);
     }
   }
-  if(m_TripInfo[rowNumber].rosterNumber[1] == NO_RECORD)
+  if(m_pTI[rowNumber].rosterNumber[1] == NO_RECORD)
   {
     strcpy(tempString, szRosterNumber[0]);
   }
@@ -557,24 +294,24 @@ void CDailyOpsBP::DisplayRow(int rowNumber)
 //
 //  Operator
 //
-  if(m_TripInfo[rowNumber].DRIVERSrecordID[0] == NO_RECORD)
+  if(m_pTI[rowNumber].DRIVERSrecordID[0] == NO_RECORD)
   {
     strcpy(tempString, "-");
   }
   else
   {
-    strcpy(tempString, BuildOperatorString(m_TripInfo[rowNumber].DRIVERSrecordID[0]));
+    strcpy(tempString, BuildOperatorString(m_pTI[rowNumber].DRIVERSrecordID[0]));
   }
-  if(m_TripInfo[rowNumber].DRIVERSrecordID[1] != NO_RECORD)
+  if(m_pTI[rowNumber].DRIVERSrecordID[1] != NO_RECORD)
   {
     strcat(tempString, "/");
-    if(m_TripInfo[rowNumber].DRIVERSrecordID[0] == NO_RECORD)
+    if(m_pTI[rowNumber].DRIVERSrecordID[0] == NO_RECORD)
     {
       strcat(tempString, "-");
     }
     else
     {
-      strcat(tempString, BuildOperatorString(m_TripInfo[rowNumber].DRIVERSrecordID[1]));
+      strcat(tempString, BuildOperatorString(m_pTI[rowNumber].DRIVERSrecordID[1]));
     }
   }
   LVI.mask = LVIF_TEXT;
@@ -587,9 +324,9 @@ void CDailyOpsBP::DisplayRow(int rowNumber)
 //
 //  Relief At
 //
-  if(m_TripInfo[rowNumber].reliefAtNODESrecordID != NO_RECORD)
+  if(m_pTI[rowNumber].reliefAtNODESrecordID != NO_RECORD)
   {
-    NODESKey0.recordID = m_TripInfo[rowNumber].reliefAtNODESrecordID;
+    NODESKey0.recordID = m_pTI[rowNumber].reliefAtNODESrecordID;
     btrieve(B_GETEQUAL, TMS_NODES, &NODES, &NODESKey0, 0);
     strncpy(tempString, NODES.abbrName, NODES_ABBRNAME_LENGTH);
     trim(tempString, NODES_ABBRNAME_LENGTH);
@@ -603,7 +340,7 @@ void CDailyOpsBP::DisplayRow(int rowNumber)
 //
 //  Find the node on the pattern
 //
-    strcpy(tempString, Tchar(m_TripInfo[rowNumber].reliefAtTime));
+    strcpy(tempString, Tchar(m_pTI[rowNumber].reliefAtTime));
     LVI.mask = LVIF_TEXT;
     LVI.iItem = rowNumber;
     LVI.iSubItem = 6;
@@ -613,12 +350,12 @@ void CDailyOpsBP::DisplayRow(int rowNumber)
 //
 //  POG and POT
 //
-  if(m_TripInfo[rowNumber].POGNODESrecordID != NO_RECORD)
+  if(m_pTI[rowNumber].POGNODESrecordID != NO_RECORD)
   {
 //
 //  POG
 //
-    NODESKey0.recordID = m_TripInfo[rowNumber].POGNODESrecordID;
+    NODESKey0.recordID = m_pTI[rowNumber].POGNODESrecordID;
     btrieve(B_GETEQUAL, TMS_NODES, &NODES, &NODESKey0, 0);
     strncpy(tempString, NODES.abbrName, NODES_ABBRNAME_LENGTH);
     trim(tempString, NODES_ABBRNAME_LENGTH);
@@ -630,7 +367,7 @@ void CDailyOpsBP::DisplayRow(int rowNumber)
 //
 //  POT
 //
-    sprintf(tempString, "%s", Tchar(m_TripInfo[rowNumber].POTime));
+    sprintf(tempString, "%s", Tchar(m_pTI[rowNumber].POTime));
     LVI.mask = LVIF_TEXT;
     LVI.iItem = rowNumber;
     LVI.iSubItem = 8;
@@ -640,7 +377,7 @@ void CDailyOpsBP::DisplayRow(int rowNumber)
 //
 //  Route
 //
-  ROUTESKey0.recordID = m_TripInfo[rowNumber].ROUTESrecordID;
+  ROUTESKey0.recordID = m_pTI[rowNumber].ROUTESrecordID;
   btrieve(B_GETEQUAL, TMS_ROUTES, &ROUTES, &ROUTESKey0, 0);
   strncpy(tempString, ROUTES.number, ROUTES_NUMBER_LENGTH);
   trim(tempString, ROUTES_NUMBER_LENGTH);
@@ -652,7 +389,7 @@ void CDailyOpsBP::DisplayRow(int rowNumber)
 //
 //  Pattern
 //
-  PATTERNNAMESKey0.recordID = m_TripInfo[rowNumber].PATTERNNAMESrecordID;
+  PATTERNNAMESKey0.recordID = m_pTI[rowNumber].PATTERNNAMESrecordID;
   btrieve(B_GETEQUAL, TMS_PATTERNNAMES, &PATTERNNAMES, &PATTERNNAMESKey0, 0);
   strncpy(tempString, PATTERNNAMES.name, PATTERNNAMES_NAME_LENGTH);
   trim(tempString, PATTERNNAMES_NAME_LENGTH);
@@ -664,7 +401,7 @@ void CDailyOpsBP::DisplayRow(int rowNumber)
 //
 //  FNode
 //
-  NODESKey0.recordID = m_TripInfo[rowNumber].fromNODESrecordID;
+  NODESKey0.recordID = m_pTI[rowNumber].fromNODESrecordID;
   btrieve(B_GETEQUAL, TMS_NODES, &NODES, &NODESKey0, 0);
   strncpy(tempString, NODES.abbrName, NODES_ABBRNAME_LENGTH);
   trim(tempString, NODES_ABBRNAME_LENGTH);
@@ -676,7 +413,7 @@ void CDailyOpsBP::DisplayRow(int rowNumber)
 //
 //  FTime
 //
-  sprintf(tempString, "%s", Tchar(m_TripInfo[rowNumber].fromTime));
+  sprintf(tempString, "%s", Tchar(m_pTI[rowNumber].fromTime));
   LVI.mask = LVIF_TEXT;
   LVI.iItem = rowNumber;
   LVI.iSubItem = 12;
@@ -685,7 +422,7 @@ void CDailyOpsBP::DisplayRow(int rowNumber)
 //
 //  TTime
 //
-  sprintf(tempString, "%s", Tchar(m_TripInfo[rowNumber].toTime));
+  sprintf(tempString, "%s", Tchar(m_pTI[rowNumber].toTime));
   LVI.mask = LVIF_TEXT;
   LVI.iItem = rowNumber;
   LVI.iSubItem = 13;
@@ -694,7 +431,7 @@ void CDailyOpsBP::DisplayRow(int rowNumber)
 //
 //  TNode
 //
-  NODESKey0.recordID = m_TripInfo[rowNumber].toNODESrecordID;
+  NODESKey0.recordID = m_pTI[rowNumber].toNODESrecordID;
   btrieve(B_GETEQUAL, TMS_NODES, &NODES, &NODESKey0, 0);
   strncpy(tempString, NODES.abbrName, NODES_ABBRNAME_LENGTH);
   trim(tempString, NODES_ABBRNAME_LENGTH);
@@ -706,12 +443,12 @@ void CDailyOpsBP::DisplayRow(int rowNumber)
 //
 //  PIG and PIT
 //
-  if(m_TripInfo[rowNumber].PIGNODESrecordID != NO_RECORD)
+  if(m_pTI[rowNumber].PIGNODESrecordID != NO_RECORD)
   {
 //
 //  PIG
 //
-    NODESKey0.recordID = m_TripInfo[rowNumber].PIGNODESrecordID;
+    NODESKey0.recordID = m_pTI[rowNumber].PIGNODESrecordID;
     btrieve(B_GETEQUAL, TMS_NODES, &NODES, &NODESKey0, 0);
     strncpy(tempString, NODES.abbrName, NODES_ABBRNAME_LENGTH);
     trim(tempString, NODES_ABBRNAME_LENGTH);
@@ -723,7 +460,7 @@ void CDailyOpsBP::DisplayRow(int rowNumber)
 //
 //  PIT
 //
-    sprintf(tempString, "%s", Tchar(m_TripInfo[rowNumber].PITime));
+    sprintf(tempString, "%s", Tchar(m_pTI[rowNumber].PITime));
     LVI.mask = LVIF_TEXT;
     LVI.iItem = rowNumber;
     LVI.iSubItem = 16;

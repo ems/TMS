@@ -93,6 +93,7 @@ BOOL FAR TMSRPT53(TMSRPTPassedDataDef *pPassedData)
   BOOL  bGotError;
   BOOL  bFinishedOK;
   BOOL  bGotNextTrip;
+  BOOL  bServiceFromRoster;
   long  SERVICESinEffect[TMSRPT53_MAXSERVICES];
   char  outputString[1024];
   char  dummy[256];
@@ -135,12 +136,16 @@ BOOL FAR TMSRPT53(TMSRPTPassedDataDef *pPassedData)
   long  lastTripNumber;
   long  previousNODESrecordID;
   long  tempLong;
+  long  date;
+  long  lastDAILYOPSrecordID;
   char  routeNumber[ROUTES_NUMBER_LENGTH + 1];
   char  serviceName[SERVICES_NAME_LENGTH + 1];
   char  directionAbbr[DIRECTIONS_ABBRNAME_LENGTH + 1];
   char  nodeAbbr[NODES_ABBRNAME_LENGTH + 1];
   char  patternName[PATTERNNAMES_NAME_LENGTH + 1];
   char  previousNodeAbbr[NODES_ABBRNAME_LENGTH + 1];
+  char  szOrganizationalUnits[COMMENTS_CODE_LENGTH + 1];
+  char  szFromToNames[PATTERNS_FROMTEXT_LENGTH + 4 + PATTERNS_TOTEXT_LENGTH + 1];
   int   stopPosition;
   int   maxRoutes;
   int   maxServices;
@@ -164,6 +169,7 @@ BOOL FAR TMSRPT53(TMSRPTPassedDataDef *pPassedData)
   int   firstDeadPattern;
   int   lastDeadPattern;
   int   pointCodeType;
+  int   extendedTypeSpecification;
 
   LINEDef *pLINE = NULL;
   POINTDef *pPOINT = NULL;
@@ -376,21 +382,57 @@ BOOL FAR TMSRPT53(TMSRPTPassedDataDef *pPassedData)
       {
         goto done;
       }
-      dayOfWeek = (tmED.tm_wday == 0 ? 6 : tmED.tm_wday - 1);
-      for(bFound = FALSE, nI = 0; nI < numServices; nI++)
+//
+//  Look to see if there's been a service/date override in DailyOps
+//
+      date = (tmED.tm_year + 1900) * 10000 + (tmED.tm_mon + 1) * 100 + tmED.tm_mday; 
+      rcode2 = btrieve(B_GETLAST, TMS_DAILYOPS, &DAILYOPS, &DAILYOPSKey0, 0);
+      lastDAILYOPSrecordID = (rcode2 == 0 ? DAILYOPS.recordID : 0);
+      DAILYOPSKey1.recordTypeFlag = (char)DAILYOPS_FLAG_DATE;
+      DAILYOPSKey1.pertainsToDate = date;
+      DAILYOPSKey1.pertainsToTime = lastDAILYOPSrecordID + 1;
+      DAILYOPSKey1.recordFlags = 0;
+      bServiceFromRoster = TRUE;
+      rcode2 = btrieve(B_GETLESSTHAN, TMS_DAILYOPS, &DAILYOPS, &DAILYOPSKey1, 1);
+      while(rcode2 == 0 &&
+            (DAILYOPS.recordTypeFlag & DAILYOPS_FLAG_DATE) &&
+             DAILYOPS.pertainsToDate == date)
       {
-        if(ROSTERPARMS.serviceDays[dayOfWeek] == SERVICESinEffect[nI])
+        if(DAILYOPS.recordFlags & DAILYOPS_FLAG_DATESET)
         {
-          bFound = TRUE;
-          break;
+          bServiceFromRoster = ANegatedRecord(DAILYOPS.recordID, 1);
+          if(!bServiceFromRoster)
+          {
+            SERVICESKey0.recordID = DAILYOPS.DOPS.Date.SERVICESrecordID;
+            break;
+          }
         }
+        rcode2 = btrieve(B_GETPREVIOUS, TMS_DAILYOPS, &DAILYOPS, &DAILYOPSKey1, 1);
       }
-      if(!bFound)
+//
+//  ...or get it from the roster setup
+//
+      if(bServiceFromRoster)
       {
-        SERVICESinEffect[numServices] = ROSTERPARMS.serviceDays[dayOfWeek];
-        numServices++;
+        dayOfWeek = (tmED.tm_wday == 0 ? 6 : tmED.tm_wday - 1);
+        for(bFound = FALSE, nI = 0; nI < numServices; nI++)
+        {
+          if(ROSTERPARMS.serviceDays[dayOfWeek] == SERVICESinEffect[nI])
+          {
+            bFound = TRUE;
+            break;
+          }
+        }
+        if(!bFound)
+        {
+          SERVICESinEffect[numServices] = ROSTERPARMS.serviceDays[dayOfWeek];
+          numServices++;
+        }
+        SERVICESKey0.recordID = ROSTERPARMS.serviceDays[dayOfWeek];
       }
-      SERVICESKey0.recordID = ROSTERPARMS.serviceDays[dayOfWeek];
+//
+//  Get the SERVICES recordID
+//
       btrieve(B_GETEQUAL, TMS_SERVICES, &SERVICES, &SERVICESKey0, 0);
       strncpy(tempString, SERVICES.name, SERVICES_NAME_LENGTH);
       trim(tempString, SERVICES_NAME_LENGTH);
@@ -472,9 +514,17 @@ BOOL FAR TMSRPT53(TMSRPTPassedDataDef *pPassedData)
       }
     }
     pLINE[PKCode - 1].recordID = ROUTES.recordID;
-    strncpy(tempString, ROUTES.number, ROUTES_NUMBER_LENGTH);
-    trim(tempString, ROUTES_NUMBER_LENGTH);
-    pLINE[PKCode - 1].number = atol(tempString);
+    if(ROUTES.alternate > 0)
+    {
+      sprintf(tempString, "%ld", ROUTES.alternate);
+      pLINE[PKCode - 1].number = ROUTES.alternate;
+    }
+    else
+    {
+      strncpy(tempString, ROUTES.number, ROUTES_NUMBER_LENGTH);
+      trim(tempString, ROUTES_NUMBER_LENGTH);
+      pLINE[PKCode - 1].number = atol(tempString);
+    }
     strcpy(pLINE[PKCode - 1].routeNumber, tempString);
 //
 //  Build the output string
@@ -1066,6 +1116,17 @@ BOOL FAR TMSRPT53(TMSRPTPassedDataDef *pPassedData)
 //  Short Text char[16]
 //  Long Text  char[24]
 //
+//  and...
+//
+//  Pattern_Property.csv
+//
+//  Variable   Type
+//  ~~~~~~~~   ~~~~
+//  Pattern    code (PK.1)
+//  Unused
+//  Unused
+//  Name       char
+//
   if(StatusBarAbort())
   {
     goto done;
@@ -1097,6 +1158,20 @@ BOOL FAR TMSRPT53(TMSRPTPassedDataDef *pPassedData)
   }
   StatusBarText("Pattern.csv and Dest.csv");
 //
+//  Pattern_Property.csv
+//
+  hfOutputFile[2] = _lcreat("Pattern_Property.csv", 0);
+  if(hfOutputFile[2] == HFILE_ERROR)
+  {
+    LoadString(hInst, ERROR_320, szFormatString, SZFORMATSTRING_LENGTH);
+    sprintf(szarString, szFormatString, tempString);
+    MessageBeep(MB_ICONSTOP);
+    MessageBox(NULL, szarString, TMS, MB_OK | MB_ICONSTOP);
+    _lclose(hfOutputFile[0]);
+    goto done;
+  }
+  StatusBarText("Pattern.csv and Dest.csv\nand Pattern_Property.csv");
+//
 //  Allocate space for the pattern codes structure
 //
   pPATCODES = (PATCODESDef *)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, sizeof(PATCODESDef) * maxPatternNodes); 
@@ -1117,6 +1192,13 @@ BOOL FAR TMSRPT53(TMSRPTPassedDataDef *pPassedData)
 //
   strcpy(outputString, "#DestinationNumber;ShortText;LongText\r\n");
   _lwrite(hfOutputFile[1], outputString, strlen(outputString));
+//
+//  Pattern_Property.csv
+//
+
+//  strcpy(outputString, "#PatternCode;;;Name\r\n");
+  strcpy(outputString, "#PatternCode;ExtendedTypeSpecification;ServiceTypeText;Name;unused;unused;OrganisationalUnits\r\n");
+  _lwrite(hfOutputFile[2], outputString, strlen(outputString));
 //
 //  Cycle through the services
 //
@@ -1144,6 +1226,27 @@ BOOL FAR TMSRPT53(TMSRPTPassedDataDef *pPassedData)
       }
       strncpy(routeNumber, ROUTES.number, ROUTES_NUMBER_LENGTH);
       trim(routeNumber, ROUTES_NUMBER_LENGTH);
+      if(ROUTES.COMMENTSrecordID == NO_RECORD)
+      {
+        strcpy(szOrganizationalUnits, "");
+      }
+      else
+      {
+        COMMENTSKey0.recordID = ROUTES.COMMENTSrecordID;
+        recordLength[TMS_COMMENTS] = COMMENTS_TOTAL_LENGTH;
+        rcode2 = btrieve(B_GETEQUAL, TMS_COMMENTS, pCommentText, &COMMENTSKey0, 0);
+        recordLength[TMS_COMMENTS] = COMMENTS_FIXED_LENGTH;
+        if(rcode2 != 0)
+        {
+          strcpy(szOrganizationalUnits, "");
+        }
+        else
+        {
+          memcpy(&COMMENTS, pCommentText, COMMENTS_FIXED_LENGTH);
+          strncpy(szOrganizationalUnits, COMMENTS.code, COMMENTS_CODE_LENGTH);
+          trim(szOrganizationalUnits, COMMENTS_CODE_LENGTH);
+        }
+      }
 //
 //  Find the line code
 //
@@ -1331,8 +1434,60 @@ BOOL FAR TMSRPT53(TMSRPTPassedDataDef *pPassedData)
             btrieve(B_GETPOSITION, TMS_PATTERNS, &PATTERNS, &PATTERNSKey0, 0);
             btrieve(B_GETDIRECT, TMS_PATTERNS, &PATTERNS, &PATTERNSKey2, 2);
 //
+//  Write out the Pattern_Property record
+//
+            PATTERNNAMESKey0.recordID = PATTERNS.PATTERNNAMESrecordID;
+            rcode2 = btrieve(B_GETEQUAL, TMS_PATTERNNAMES, &PATTERNNAMES, &PATTERNNAMESKey0, 0);
+            if(rcode2 == 0)
+            {
+              strncpy(patternName, PATTERNNAMES.name, PATTERNNAMES_NAME_LENGTH);
+              trim(patternName, PATTERNNAMES_NAME_LENGTH);
+            }
+            else
+            {
+              strcpy(patternName, "????");
+            }
+//
+//  Get the extended type is it exists
+//
+            extendedTypeSpecification = 0;
+            if(ROUTES.COMMENTSrecordID != NO_RECORD)
+            {
+              COMMENTSKey0.recordID = ROUTES.COMMENTSrecordID;
+              recordLength[TMS_COMMENTS] = COMMENTS_TOTAL_LENGTH;
+              rcode2 = btrieve(B_GETEQUAL, TMS_COMMENTS, pCommentText, &COMMENTSKey0, 0);
+              recordLength[TMS_COMMENTS] = COMMENTS_FIXED_LENGTH;
+              if(rcode2 == 0)
+              {
+                memcpy(&COMMENTS, pCommentText, COMMENTS_FIXED_LENGTH);
+                strncpy(tempString, COMMENTS.code, COMMENTS_CODE_LENGTH);
+                trim(tempString, COMMENTS_CODE_LENGTH);
+                if(strcmp(tempString, "Express") == 0)
+                {
+                  extendedTypeSpecification = 1;
+                }
+                else if(strcmp(tempString, "LTD Stop") == 0)
+                {
+                  extendedTypeSpecification = 2;
+                }
+              }
+            }
+//
 //  Get everything from this pattern
 //
+            strncpy(szFromToNames, PATTERNS.fromText, PATTERNS_FROMTEXT_LENGTH);
+            trim(szFromToNames, PATTERNS_FROMTEXT_LENGTH);
+            if(strcmp(szFromToNames, "") != 0)
+            {
+              strcat(szFromToNames, " to ");
+              strncpy(szarString, PATTERNS.toText, PATTERNS_TOTEXT_LENGTH);
+              trim(szarString, PATTERNS_TOTEXT_LENGTH);
+              strcat(szFromToNames, szarString);
+            }
+//            sprintf(outputString, "%d;;;%s\r\n", PKCode, patternName);
+//            sprintf(outputString, "%d;%d;;%s;;;%s\r\n", PKCode, extendedTypeSpecification, patternName, szOrganizationalUnits);
+            sprintf(outputString, "%d;%d;;\"%s\";;;%s\r\n", PKCode, extendedTypeSpecification, szFromToNames, szOrganizationalUnits);
+            _lwrite(hfOutputFile[2], outputString, strlen(outputString));
             PATTERNNAMESrecordID = PATTERNS.PATTERNNAMESrecordID;
             fromLongitude = NO_RECORD;
             PKOrder = 1;
@@ -1951,6 +2106,7 @@ BOOL FAR TMSRPT53(TMSRPTPassedDataDef *pPassedData)
 //
   _lclose(hfOutputFile[0]);
   _lclose(hfOutputFile[1]);
+  _lclose(hfOutputFile[2]);
 //
 //  Journey.csv
 //
@@ -2123,6 +2279,10 @@ BOOL FAR TMSRPT53(TMSRPTPassedDataDef *pPassedData)
                 TRIPS.SERVICESrecordID == SERVICES.recordID &&
                 TRIPS.directionIndex == nK)
           {
+            if(TRIPS.tripNumber == 7895)
+            {
+              TRIPS.tripNumber = 7895;
+            }
 //
 //  Generate it
 //

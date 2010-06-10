@@ -242,6 +242,8 @@ public:
 	afx_msg void OnEditInsertSdConnection();
 	afx_msg void OnCommandsOptimalhookBlocks();
 	afx_msg void OnEditCreateplaceholderruns();
+	afx_msg void OnEditUpdateRangeTripnumbers();
+	afx_msg void OnCommandsForcePopi();
 	//}}AFX_MSG
   void OnEditChangeTripData(WPARAM which);
 	void OnWindowCloseallwindows();

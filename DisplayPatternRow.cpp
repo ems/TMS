@@ -3,6 +3,8 @@
 //  and is Copyright (C) 1991-2004 Schedule Masters, Inc.
 //  All rights reserved.
 //
+#pragma warning (disable: 4786)
+
 #include "stdafx.h"
 extern "C" {
 #include "TMSHeader.h"

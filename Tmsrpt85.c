@@ -65,7 +65,7 @@ BOOL FAR TMSRPT85(TMSRPTPassedDataDef *pPassedData)
   char  travelDirections[1024];
   char  szDivisionName[DIVISIONS_NAME_LENGTH + 1];
   char  szServiceName[SERVICES_NAME_LENGTH + 1];
-  char   szRouteNumber[ROUTES_NUMBER_LENGTH + 1];
+  char  szRouteNumber[ROUTES_NUMBER_LENGTH + 1];
   char  commentCode[COMMENTS_CODE_LENGTH + 1];
   char  intersection[NODES_INTERSECTION_LENGTH + 1];
   char  garageAbbr[NODES_ABBRNAME_LENGTH + 1];
@@ -308,10 +308,6 @@ BOOL FAR TMSRPT85(TMSRPTPassedDataDef *pPassedData)
       if(nJ != 0)
       {
         rcode2 = btrieve(B_GETNEXT, TMS_RUNS, &RUNS, &RUNSKey1, 1);
-        sprintf(tempString, "%ld\t\"%s\"\t\"%s\"\t%ld\t\"%s\"\t\"%s\"\t\"%s\"\t\"%s\"\r\n",
-              seq++, szDivisionName, szServiceName, RUNS.runNumber, 
-              szRuntype, szReportTime, szPayTime, szEndTime);
-        WriteFile(hOutputFile, (LPCVOID *)tempString, strlen(tempString), &dwBytesWritten, NULL);
       }
       else
       {
@@ -325,6 +321,16 @@ BOOL FAR TMSRPT85(TMSRPTPassedDataDef *pPassedData)
       }
 //
 //  Start of piece information
+//
+      sprintf(szarString, "> > > > Piece %d of %d < < < <", nJ + 1, numPieces);
+      sprintf(tempString, "%ld\t\"%s\"\t\"%s\"\t%ld\t\"%s\"\t\"%s\"\t\"%s\"\t\"%s\"\t\"%s\"\r\n",
+            seq++, szDivisionName, szServiceName, RUNS.runNumber, 
+            szRuntype, szReportTime, szPayTime, szEndTime, szarString);
+      WriteFile(hOutputFile, (LPCVOID *)tempString, strlen(tempString), &dwBytesWritten, NULL);
+      sprintf(tempString, "%ld\t\"%s\"\t\"%s\"\t%ld\t\"%s\"\t\"%s\"\t\"%s\"\t\"%s\"\r\n",
+            seq++, szDivisionName, szServiceName, RUNS.runNumber, 
+            szRuntype, szReportTime, szPayTime, szEndTime);
+      WriteFile(hOutputFile, (LPCVOID *)tempString, strlen(tempString), &dwBytesWritten, NULL);
 //
 //  Report at time and location
 //
@@ -367,6 +373,10 @@ BOOL FAR TMSRPT85(TMSRPTPassedDataDef *pPassedData)
               seq++, szDivisionName, szServiceName, RUNS.runNumber, 
               szRuntype, szReportTime, szPayTime, szEndTime, szarString);
         WriteFile(hOutputFile, (LPCVOID *)tempString, strlen(tempString), &dwBytesWritten, NULL);
+        sprintf(tempString, "%ld\t\"%s\"\t\"%s\"\t%ld\t\"%s\"\t\"%s\"\t\"%s\"\t\"%s\"\r\n",
+              seq++, szDivisionName, szServiceName, RUNS.runNumber, 
+              szRuntype, szReportTime, szPayTime, szEndTime);
+        WriteFile(hOutputFile, (LPCVOID *)tempString, strlen(tempString), &dwBytesWritten, NULL);
       }
 //
 //  Dump out any travel instructions
@@ -399,6 +409,10 @@ BOOL FAR TMSRPT85(TMSRPTPassedDataDef *pPassedData)
               WriteFile(hOutputFile, (LPCVOID *)tempString, strlen(tempString), &dwBytesWritten, NULL);
               ptr = strtok(NULL, lineSep);
             }
+            sprintf(tempString, "%ld\t\"%s\"\t\"%s\"\t%ld\t\"%s\"\t\"%s\"\t\"%s\"\t\"%s\"\r\n",
+                  seq++, szDivisionName, szServiceName, RUNS.runNumber, 
+                  szRuntype, szReportTime, szPayTime, szEndTime);
+            WriteFile(hOutputFile, (LPCVOID *)tempString, strlen(tempString), &dwBytesWritten, NULL);
           }
         }
 //
@@ -569,6 +583,10 @@ BOOL FAR TMSRPT85(TMSRPTPassedDataDef *pPassedData)
                     szRuntype, szReportTime, szPayTime, szEndTime, szarString);
               WriteFile(hOutputFile, (LPCVOID *)tempString, strlen(tempString), &dwBytesWritten, NULL);
             }
+            sprintf(tempString, "%ld\t\"%s\"\t\"%s\"\t%ld\t\"%s\"\t\"%s\"\t\"%s\"\t\"%s\"\r\n",
+                  seq++, szDivisionName, szServiceName, RUNS.runNumber, 
+                  szRuntype, szReportTime, szPayTime, szEndTime);
+            WriteFile(hOutputFile, (LPCVOID *)tempString, strlen(tempString), &dwBytesWritten, NULL);
             bFirstTrip = FALSE;  // Cause the pattern will start with the first timepoint on a P/O
           }
         }
@@ -696,7 +714,7 @@ BOOL FAR TMSRPT85(TMSRPTPassedDataDef *pPassedData)
 //
 //  Is this a pull-in?  If so, get the time.
 //
-      if(TRIPS.standard.PIGNODESrecordID != NO_RECORD)
+      if(TRIPS.standard.PIGNODESrecordID != NO_RECORD && TRIPS.standard.PIGNODESrecordID == RUNS.end.NODESrecordID)
       {
         strcpy(szarString, "Pull-in to:");
         sprintf(tempString, "%ld\t\"%s\"\t\"%s\"\t%ld\t\"%s\"\t\"%s\"\t\"%s\"\t\"%s\"\t\"%s\"\r\n",
@@ -730,19 +748,28 @@ BOOL FAR TMSRPT85(TMSRPTPassedDataDef *pPassedData)
 //
       else
       {
-        rcode2 = btrieve(B_GETNEXT, TMS_TRIPS, &TRIPS, &TRIPSKey2, 2);
-        if(rcode2 == 0 && TRIPS.standard.blockNumber == blockNumber)
+//
+//  Only show the next route if we're at the end of the trip
+//
+        if(RUNS.end.NODESrecordID == GTResults.lastNODESrecordID)
         {
-          ROUTESKey0.recordID = TRIPS.ROUTESrecordID;
-          rcode2 = btrieve(B_GETEQUAL, TMS_ROUTES, &ROUTES, &ROUTESKey0, 0);
-          strncpy(tempString, ROUTES.number, ROUTES_NUMBER_LENGTH);
-          trim(tempString, ROUTES_NUMBER_LENGTH);
-          sprintf(szarString, "Next route on this block: %s", tempString);
-          sprintf(tempString, "%ld\t\"%s\"\t\"%s\"\t%ld\t\"%s\"\t\"%s\"\t\"%s\"\t\"%s\"\t\"%s\"\r\n",
-                seq++, szDivisionName, szServiceName, RUNS.runNumber, 
-                szRuntype, szReportTime, szPayTime, szEndTime, szarString);
-          WriteFile(hOutputFile, (LPCVOID *)tempString, strlen(tempString), &dwBytesWritten, NULL);
+          rcode2 = btrieve(B_GETNEXT, TMS_TRIPS, &TRIPS, &TRIPSKey2, 2);
+          if(rcode2 == 0 && TRIPS.standard.blockNumber == blockNumber)
+          {
+            ROUTESKey0.recordID = TRIPS.ROUTESrecordID;
+            rcode2 = btrieve(B_GETEQUAL, TMS_ROUTES, &ROUTES, &ROUTESKey0, 0);
+            strncpy(tempString, ROUTES.number, ROUTES_NUMBER_LENGTH);
+            trim(tempString, ROUTES_NUMBER_LENGTH);
+            sprintf(szarString, "Next route on this block: %s", tempString);
+            sprintf(tempString, "%ld\t\"%s\"\t\"%s\"\t%ld\t\"%s\"\t\"%s\"\t\"%s\"\t\"%s\"\t\"%s\"\r\n",
+                  seq++, szDivisionName, szServiceName, RUNS.runNumber, 
+                  szRuntype, szReportTime, szPayTime, szEndTime, szarString);
+            WriteFile(hOutputFile, (LPCVOID *)tempString, strlen(tempString), &dwBytesWritten, NULL);
+          }
         }
+//
+//  Show who's relieving us
+//
         for(nK = 0; nK < numInRunsave; nK++)
         {
           if(NodesEquivalent(RUNS.end.NODESrecordID, RUNSAVE[nK].start.NODESrecordID, &equivalentTravelTime) &&
@@ -784,6 +811,10 @@ BOOL FAR TMSRPT85(TMSRPTPassedDataDef *pPassedData)
             WriteFile(hOutputFile, (LPCVOID *)tempString, strlen(tempString), &dwBytesWritten, NULL);
             ptr = strtok(NULL, lineSep);
           }
+          sprintf(tempString, "%ld\t\"%s\"\t\"%s\"\t%ld\t\"%s\"\t\"%s\"\t\"%s\"\t\"%s\"\r\n",
+                seq++, szDivisionName, szServiceName, RUNS.runNumber, 
+                szRuntype, szReportTime, szPayTime, szEndTime);
+          WriteFile(hOutputFile, (LPCVOID *)tempString, strlen(tempString), &dwBytesWritten, NULL);
         }
       }
 //
@@ -840,6 +871,10 @@ BOOL FAR TMSRPT85(TMSRPTPassedDataDef *pPassedData)
               seq++, szDivisionName, szServiceName, RUNS.runNumber, 
               szRuntype, szReportTime, szPayTime, szEndTime, szarString);
         WriteFile(hOutputFile, (LPCVOID *)tempString, strlen(tempString), &dwBytesWritten, NULL);
+        sprintf(tempString, "%ld\t\"%s\"\t\"%s\"\t%ld\t\"%s\"\t\"%s\"\t\"%s\"\t\"%s\"\r\n",
+              seq++, szDivisionName, szServiceName, RUNS.runNumber, 
+              szRuntype, szReportTime, szPayTime, szEndTime);
+        WriteFile(hOutputFile, (LPCVOID *)tempString, strlen(tempString), &dwBytesWritten, NULL);
       }
 //
 //  Off at
@@ -884,7 +919,7 @@ BOOL FAR TMSRPT85(TMSRPTPassedDataDef *pPassedData)
               seq++, szDivisionName, szServiceName, RUNS.runNumber, 
               szRuntype, szReportTime, szPayTime, szEndTime);
         WriteFile(hOutputFile, (LPCVOID *)tempString, strlen(tempString), &dwBytesWritten, NULL);
-        strcpy(szarString, "Comments:");
+        strcpy(szarString, "Notes:");
         sprintf(tempString, "%ld\t\"%s\"\t\"%s\"\t%ld\t\"%s\"\t\"%s\"\t\"%s\"\t\"%s\"\t\"%s\"\r\n",
               seq++, szDivisionName, szServiceName, RUNS.runNumber, 
               szRuntype, szReportTime, szPayTime, szEndTime, szarString);
@@ -898,7 +933,7 @@ BOOL FAR TMSRPT85(TMSRPTPassedDataDef *pPassedData)
           memcpy(&COMMENTS, pCommentText, COMMENTS_FIXED_LENGTH);
           strncpy(szarString, COMMENTS.code, COMMENTS_CODE_LENGTH);
           trim(szarString, COMMENTS_CODE_LENGTH);
-          sprintf(tempString, "%ld\t\"%s\"\t\"%s\"\t%ld\t\"%s\"\t\"%s\"\t\"%s\"\t\"%s\"\t\"%s\"\r\n",
+          sprintf(tempString, "%ld\t\"%s\"\t\"%s\"\t%ld\t\"%s\"\t\"%s\"\t\"%s\"\t\"%s\"\t\"  %s\"\r\n",
                 seq++, szDivisionName, szServiceName, RUNS.runNumber, 
                 szRuntype, szReportTime, szPayTime, szEndTime, szarString);
           WriteFile(hOutputFile, (LPCVOID *)tempString, strlen(tempString), &dwBytesWritten, NULL);
@@ -907,7 +942,7 @@ BOOL FAR TMSRPT85(TMSRPTPassedDataDef *pPassedData)
                tempString2 = strtok(NULL, "\r\n") )
           {
             strcpy(szarString, tempString2 );
-            sprintf(tempString, "%ld\t\"%s\"\t\"%s\"\t%ld\t\"%s\"\t\"%s\"\t\"%s\"\t\"%s\"\t\"%s\"\r\n",
+            sprintf(tempString, "%ld\t\"%s\"\t\"%s\"\t%ld\t\"%s\"\t\"%s\"\t\"%s\"\t\"%s\"\t\"    %s\"\r\n",
                   seq++, szDivisionName, szServiceName, RUNS.runNumber, 
                   szRuntype, szReportTime, szPayTime, szEndTime, szarString);
             WriteFile(hOutputFile, (LPCVOID *)tempString, strlen(tempString), &dwBytesWritten, NULL);
@@ -934,13 +969,13 @@ BOOL FAR TMSRPT85(TMSRPTPassedDataDef *pPassedData)
           btrieve(B_GETEQUAL, TMS_SIGNCODES, &SIGNCODES, &SIGNCODESKey0, 0);
           strncpy(szarString, SIGNCODES.code, SIGNCODES_CODE_LENGTH);
           trim(szarString, SIGNCODES_CODE_LENGTH);
-          sprintf(tempString, "%ld\t\"%s\"\t\"%s\"\t%ld\t\"%s\"\t\"%s\"\t\"%s\"\t\"%s\"\t\"%s\"\r\n",
+          sprintf(tempString, "%ld\t\"%s\"\t\"%s\"\t%ld\t\"%s\"\t\"%s\"\t\"%s\"\t\"%s\"\t\"  %s\"\r\n",
                 seq++, szDivisionName, szServiceName, RUNS.runNumber, 
                 szRuntype, szReportTime, szPayTime, szEndTime, szarString);
           WriteFile(hOutputFile, (LPCVOID *)tempString, strlen(tempString), &dwBytesWritten, NULL);
           strncpy(szarString, SIGNCODES.text, SIGNCODES_TEXT_LENGTH);
           trim(szarString, SIGNCODES_TEXT_LENGTH);
-          sprintf(tempString, "%ld\t\"%s\"\t\"%s\"\t%ld\t\"%s\"\t\"%s\"\t\"%s\"\t\"%s\"\t\"%s\"\r\n",
+          sprintf(tempString, "%ld\t\"%s\"\t\"%s\"\t%ld\t\"%s\"\t\"%s\"\t\"%s\"\t\"%s\"\t\"    %s\"\r\n",
                 seq++, szDivisionName, szServiceName, RUNS.runNumber, 
                 szRuntype, szReportTime, szPayTime, szEndTime, szarString);
           WriteFile(hOutputFile, (LPCVOID *)tempString, strlen(tempString), &dwBytesWritten, NULL);
@@ -967,7 +1002,7 @@ BOOL FAR TMSRPT85(TMSRPTPassedDataDef *pPassedData)
       memcpy(&COMMENTS, pCommentText, COMMENTS_FIXED_LENGTH);
       strncpy(szarString, COMMENTS.code, COMMENTS_CODE_LENGTH);
       trim(szarString, COMMENTS_CODE_LENGTH);
-      sprintf(tempString, "%ld\t\"%s\"\t\"%s\"\t%ld\t\"%s\"\t\"%s\"\t\"%s\"\t\"%s\"\t\"%s\"\r\n",
+      sprintf(tempString, "%ld\t\"%s\"\t\"%s\"\t%ld\t\"%s\"\t\"%s\"\t\"%s\"\t\"%s\"\t\"  %s\"\r\n",
             seq++, szDivisionName, szServiceName, RUNS.runNumber, 
             szRuntype, szReportTime, szPayTime, szEndTime, szarString);
       WriteFile(hOutputFile, (LPCVOID *)tempString, strlen(tempString), &dwBytesWritten, NULL);
@@ -976,7 +1011,7 @@ BOOL FAR TMSRPT85(TMSRPTPassedDataDef *pPassedData)
            tempString2 = strtok(NULL, "\r\n") )
       {
         strcpy(szarString, tempString2 );
-        sprintf(tempString, "%ld\t\"%s\"\t\"%s\"\t%ld\t\"%s\"\t\"%s\"\t\"%s\"\t\"%s\"\t\"%s\"\r\n",
+        sprintf(tempString, "%ld\t\"%s\"\t\"%s\"\t%ld\t\"%s\"\t\"%s\"\t\"%s\"\t\"%s\"\t\"    %s\"\r\n",
               seq++, szDivisionName, szServiceName, RUNS.runNumber, 
               szRuntype, szReportTime, szPayTime, szEndTime, szarString);
         WriteFile(hOutputFile, (LPCVOID *)tempString, strlen(tempString), &dwBytesWritten, NULL);

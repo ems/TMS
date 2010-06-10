@@ -158,7 +158,7 @@ BOOL FAR TMSRPT70Ex(TMSRPTPassedDataDef *pPassedData)
 //
 //  Test for geocode
 //
-  bAllGeocoded = FALSE;
+  bAllGeocoded = TRUE;
   rcode2 = btrieve(B_GETFIRST, TMS_NODES, &NODES, &NODESKey0, 0);
   while(rcode2 == 0)
   {
@@ -944,6 +944,7 @@ BOOL FAR TMSRPT70Ex(TMSRPTPassedDataDef *pPassedData)
           }
           trim(tempString, maxLength[4]);
           ILGRouteStops.m_StopAbbr = tempString;
+          StatusBarText(tempString);
 //
 //  TimePointAbbr
 //
@@ -1483,67 +1484,73 @@ BOOL FAR TMSRPT70Ex(TMSRPTPassedDataDef *pPassedData)
               TRIPS.SERVICESrecordID == SERVICES.recordID &&
               TRIPS.directionIndex == nJ)
         {
-          ILGTrips.AddNew();
+//
+//  14-Apr-10 - Only unload those trips that are blocked
+//
+          if(pTRIPSChunk->blockNumber > 0)
+          {
+            ILGTrips.AddNew();
 //
 //  TripID (use recordID)
 //
-          ILGTrips.m_TripID = TRIPS.recordID;
+            ILGTrips.m_TripID = TRIPS.recordID;
 //
 //  TripNum
 //
-          ILGTrips.m_TripNum = TRIPS.tripNumber;
+            ILGTrips.m_TripNum = TRIPS.tripNumber;
 //
 //  BlockNum
 //
-          ILGTrips.m_BlockNum = pTRIPSChunk->blockNumber;
+            ILGTrips.m_BlockNum = pTRIPSChunk->blockNumber;
 //
 //  ServiceAbbr
 //
-          strncpy(tempString, SERVICES.name, SERVICES_NAME_LENGTH);
-          trim(tempString, SERVICES_NAME_LENGTH);
-          trim(tempString, maxLength[0]);
-          ILGTrips.m_ServiceAbbr = tempString;
-          strcpy(szarString, tempString);
+            strncpy(tempString, SERVICES.name, SERVICES_NAME_LENGTH);
+            trim(tempString, SERVICES_NAME_LENGTH);
+            trim(tempString, maxLength[0]);
+            ILGTrips.m_ServiceAbbr = tempString;
+            strcpy(szarString, tempString);
 //
 //  RouteAbbr
 //
-          strncpy(tempString, ROUTES.number, ROUTES_NUMBER_LENGTH);
-          trim(tempString, ROUTES_NUMBER_LENGTH);
-          trim(tempString, maxLength[1]);
-          ILGTrips.m_RouteAbbr = tempString;
-          strcat(szarString, " Route ");
-          strcat(szarString, tempString);
+            strncpy(tempString, ROUTES.number, ROUTES_NUMBER_LENGTH);
+            trim(tempString, ROUTES_NUMBER_LENGTH);
+            trim(tempString, maxLength[1]);
+            ILGTrips.m_RouteAbbr = tempString;
+            strcat(szarString, " Route ");
+            strcat(szarString, tempString);
 //
 //  RouteDirectionAbbr
 //
-          DIRECTIONSKey0.recordID = ROUTES.DIRECTIONSrecordID[nJ];
-          rcode2 = btrieve(B_GETEQUAL, TMS_DIRECTIONS, &DIRECTIONS, &DIRECTIONSKey0, 0);
-          strncpy(tempString, DIRECTIONS.abbrName, DIRECTIONS_ABBRNAME_LENGTH);
-          trim(tempString, DIRECTIONS_ABBRNAME_LENGTH);
-          trim(tempString, maxLength[2]);
-          ILGTrips.m_RouteDirectionAbbr = tempString;
-          strcat(szarString, " ");
-          strcat(szarString, tempString);
-          StatusBarText(szarString);
+            DIRECTIONSKey0.recordID = ROUTES.DIRECTIONSrecordID[nJ];
+            rcode2 = btrieve(B_GETEQUAL, TMS_DIRECTIONS, &DIRECTIONS, &DIRECTIONSKey0, 0);
+            strncpy(tempString, DIRECTIONS.abbrName, DIRECTIONS_ABBRNAME_LENGTH);
+            trim(tempString, DIRECTIONS_ABBRNAME_LENGTH);
+            trim(tempString, maxLength[2]);
+            ILGTrips.m_RouteDirectionAbbr = tempString;
+            strcat(szarString, " ");
+            strcat(szarString, tempString);
+            StatusBarText(szarString);
 //
 //  PatternAbbr (which has the service number prepended to the name)
 //
-          PATTERNNAMESKey0.recordID = TRIPS.PATTERNNAMESrecordID;
-          rcode2 = btrieve(B_GETEQUAL, TMS_PATTERNNAMES, &PATTERNNAMES, &PATTERNNAMESKey0, 0);
-          strncpy(szarString, PATTERNNAMES.name, PATTERNNAMES_NAME_LENGTH);
-          trim(szarString, PATTERNNAMES_NAME_LENGTH);
-          sprintf(tempString, "%ld%s", SERVICES.number, szarString);
-          trim(tempString, maxLength[0]);
-          ILGTrips.m_PatternAbbr = tempString;
+            PATTERNNAMESKey0.recordID = TRIPS.PATTERNNAMESrecordID;
+            rcode2 = btrieve(B_GETEQUAL, TMS_PATTERNNAMES, &PATTERNNAMES, &PATTERNNAMESKey0, 0);
+            strncpy(szarString, PATTERNNAMES.name, PATTERNNAMES_NAME_LENGTH);
+            trim(szarString, PATTERNNAMES_NAME_LENGTH);
+            sprintf(tempString, "%ld%s", SERVICES.number, szarString);
+            trim(tempString, maxLength[0]);
+            ILGTrips.m_PatternAbbr = tempString;
 //
 //  BlockSequence
 //
-          ILGTrips.m_BlockSequence = pTRIPSChunk->blockSequence;
+            ILGTrips.m_BlockSequence = pTRIPSChunk->blockSequence;
 //
 //  Insert
 //
-          ILGTrips.Update();
-          ILGTrips.MoveNext();
+            ILGTrips.Update();
+            ILGTrips.MoveNext();
+          }
 //
 //  Get the next trip
 //
@@ -1628,16 +1635,64 @@ BOOL FAR TMSRPT70Ex(TMSRPTPassedDataDef *pPassedData)
               TRIPS.SERVICESrecordID == SERVICES.recordID &&
               TRIPS.directionIndex == nJ)
         {
-          GenerateTrip(TRIPS.ROUTESrecordID, TRIPS.SERVICESrecordID,
-                TRIPS.directionIndex, TRIPS.PATTERNNAMESrecordID,
-                TRIPS.timeAtMLP, GENERATETRIP_FLAG_DISPLAYERRORS, &GTResults);
+//
+//  14-Apr-10 - Only unload those trips that are blocked
+//
+          if(pTRIPSChunk->blockNumber > 0)
+          {
+            GenerateTrip(TRIPS.ROUTESrecordID, TRIPS.SERVICESrecordID,
+                  TRIPS.directionIndex, TRIPS.PATTERNNAMESrecordID,
+                  TRIPS.timeAtMLP, GENERATETRIP_FLAG_DISPLAYERRORS, &GTResults);
 //
 //  Go through the pattern twice
 //
 //  Pass 1 - Determine distances at each timepoint
 //
-          if(GTResults.tripDistance != 0.0)
-          {
+            if(GTResults.tripDistance != 0.0)
+            {
+              PATTERNSKey2.ROUTESrecordID = ROUTES.recordID;
+              PATTERNSKey2.SERVICESrecordID = SERVICES.recordID;
+              PATTERNSKey2.directionIndex = nJ;
+              PATTERNSKey2.PATTERNNAMESrecordID = TRIPS.PATTERNNAMESrecordID;
+              PATTERNSKey2.nodeSequence = NO_RECORD;
+              rcode2 = btrieve(B_GETGREATER, TMS_PATTERNS, &PATTERNS, &PATTERNSKey2, 2);
+              tripIndex = 0;
+              distanceToHere = 0.0;
+              while(rcode2 == 0 &&
+                    PATTERNS.ROUTESrecordID == ROUTES.recordID &&
+                    PATTERNS.SERVICESrecordID == SERVICES.recordID &&
+                    PATTERNS.directionIndex == nJ &&
+                    PATTERNS.PATTERNNAMESrecordID == TRIPS.PATTERNNAMESrecordID)
+              {
+                NODESKey0.recordID = PATTERNS.NODESrecordID;
+                rcode2 = btrieve(B_GETEQUAL, TMS_NODES, &NODES, &NODESKey0, 0);
+                if(tripIndex == 0)
+                {
+                  distanceToHere = 0;
+                }
+                else
+                {
+                  if(bAllGeocoded)
+                  {
+                    distanceToHere += (float)GreatCircleDistance(prevLon, prevLat, NODES.longitude, NODES.latitude);
+                  }
+                }
+                if(PATTERNS.flags & PATTERNS_FLAG_BUSSTOP)
+                {
+                }
+                else
+                {
+                  tripDistances[tripIndex] = distanceToHere;
+                  tripIndex++;
+                }
+                prevLat = NODES.latitude;
+                prevLon = NODES.longitude;
+                rcode2 = btrieve(B_GETNEXT, TMS_PATTERNS, &PATTERNS, &PATTERNSKey2, 2);
+              }
+            }
+//
+//  Pass 2 - Determine time interpolations
+//
             PATTERNSKey2.ROUTESrecordID = ROUTES.recordID;
             PATTERNSKey2.SERVICESrecordID = SERVICES.recordID;
             PATTERNSKey2.directionIndex = nJ;
@@ -1645,7 +1700,7 @@ BOOL FAR TMSRPT70Ex(TMSRPTPassedDataDef *pPassedData)
             PATTERNSKey2.nodeSequence = NO_RECORD;
             rcode2 = btrieve(B_GETGREATER, TMS_PATTERNS, &PATTERNS, &PATTERNSKey2, 2);
             tripIndex = 0;
-            distanceToHere = 0.0;
+            stopNumber = 1;
             while(rcode2 == 0 &&
                   PATTERNS.ROUTESrecordID == ROUTES.recordID &&
                   PATTERNS.SERVICESrecordID == SERVICES.recordID &&
@@ -1654,105 +1709,63 @@ BOOL FAR TMSRPT70Ex(TMSRPTPassedDataDef *pPassedData)
             {
               NODESKey0.recordID = PATTERNS.NODESrecordID;
               rcode2 = btrieve(B_GETEQUAL, TMS_NODES, &NODES, &NODESKey0, 0);
-              if(tripIndex == 0)
+              if(NODES.flags & NODES_FLAG_STOP)
               {
-                distanceToHere = 0;
-              }
-              else
-              {
-                if(bAllGeocoded)
+                timeAtStop = 0;
+                if(GTResults.tripDistance == 0)
                 {
-                  distanceToHere += (float)GreatCircleDistance(prevLon, prevLat, NODES.longitude, NODES.latitude);
+                  if(bAllGeocoded)
+                  {
+                    timeAtStop = GTResults.tripTimes[tripIndex - 1];
+                  }
                 }
-              }
-              if(PATTERNS.flags & PATTERNS_FLAG_BUSSTOP)
-              {
-              }
-              else
-              {
-                tripDistances[tripIndex] = distanceToHere;
-                tripIndex++;
-              }
-              prevLat = NODES.latitude;
-              prevLon = NODES.longitude;
-              rcode2 = btrieve(B_GETNEXT, TMS_PATTERNS, &PATTERNS, &PATTERNSKey2, 2);
-            }
-          }
-//
-//  Pass 2 - Determine time interpolations
-//
-          PATTERNSKey2.ROUTESrecordID = ROUTES.recordID;
-          PATTERNSKey2.SERVICESrecordID = SERVICES.recordID;
-          PATTERNSKey2.directionIndex = nJ;
-          PATTERNSKey2.PATTERNNAMESrecordID = TRIPS.PATTERNNAMESrecordID;
-          PATTERNSKey2.nodeSequence = NO_RECORD;
-          rcode2 = btrieve(B_GETGREATER, TMS_PATTERNS, &PATTERNS, &PATTERNSKey2, 2);
-          tripIndex = 0;
-          stopNumber = 1;
-          while(rcode2 == 0 &&
-                PATTERNS.ROUTESrecordID == ROUTES.recordID &&
-                PATTERNS.SERVICESrecordID == SERVICES.recordID &&
-                PATTERNS.directionIndex == nJ &&
-                PATTERNS.PATTERNNAMESrecordID == TRIPS.PATTERNNAMESrecordID)
-          {
-            NODESKey0.recordID = PATTERNS.NODESrecordID;
-            rcode2 = btrieve(B_GETEQUAL, TMS_NODES, &NODES, &NODESKey0, 0);
-            if(NODES.flags & NODES_FLAG_STOP)
-            {
-              timeAtStop = 0;
-              if(GTResults.tripDistance == 0)
-              {
-                if(bAllGeocoded)
+                else
                 {
-                  timeAtStop = GTResults.tripTimes[tripIndex - 1];
+                  if(bAllGeocoded)
+                  {
+                    distanceToHere += (float)GreatCircleDistance(prevLon, prevLat, NODES.longitude, NODES.latitude);
+                    timeAtStop = (long)((GTResults.tripTimes[tripIndex] - GTResults.tripTimes[tripIndex - 1]) *
+                          (distanceToHere / (tripDistances[tripIndex] - tripDistances[tripIndex - 1])));
+                    timeAtStop += GTResults.tripTimes[tripIndex - 1];
+//                    timeAtStop += (GTResults.tripTimes[tripIndex - 1] - GTResults.firstNodeTime);
+                  }
                 }
               }
               else
               {
+                timeAtStop = GTResults.tripTimes[tripIndex];
+                tripIndex++;  
                 if(bAllGeocoded)
                 {
-                  distanceToHere += (float)GreatCircleDistance(prevLon, prevLat, NODES.longitude, NODES.latitude);
-                  timeAtStop = (long)((GTResults.tripTimes[tripIndex] - GTResults.tripTimes[tripIndex - 1]) *
-                        (distanceToHere / (tripDistances[tripIndex] - tripDistances[tripIndex - 1])));
-//                  timeAtStop += GTResults.tripTimes[tripIndex - 1];
-                  timeAtStop += (GTResults.tripTimes[tripIndex - 1] - GTResults.firstNodeTime);
+                  distanceToHere = 0.0;
                 }
               }
-            }
-            else
-            {
-              timeAtStop = GTResults.tripTimes[tripIndex];
-              tripIndex++;  
-              if(bAllGeocoded)
-              {
-                distanceToHere = 0.0;
-              }
-            }
-            ILGTripStops.AddNew();
+              ILGTripStops.AddNew();
 //
 //  TripID
 //
-            ILGTripStops.m_TripID = TRIPS.recordID;
+              ILGTripStops.m_TripID = TRIPS.recordID;
 //
 //  StopNumber
 //
-            ILGTripStops.m_StopNum = stopNumber++;
+              ILGTripStops.m_StopNum = stopNumber++;
 //
 //  CrossingTimeInMinutes
 //
-            ILGTripStops.m_CrossingTimeInMinutes = timeAtStop / 60;
+              ILGTripStops.m_CrossingTimeInMinutes = timeAtStop / 60;
 //
 //  Insert
 //
-            ILGTripStops.Update();
-            ILGTripStops.MoveNext();
+              ILGTripStops.Update();
+              ILGTripStops.MoveNext();
 //
 //  Get the next node on the pattern
 //
-            prevLat = NODES.latitude;
-            prevLon = NODES.longitude;
-            rcode2 = btrieve(B_GETNEXT, TMS_PATTERNS, &PATTERNS, &PATTERNSKey2, 2);
-          }  // while patterns
+              prevLat = NODES.latitude;
+              prevLon = NODES.longitude;
+              rcode2 = btrieve(B_GETNEXT, TMS_PATTERNS, &PATTERNS, &PATTERNSKey2, 2);
+            }  // while patterns
+          }  // block# > 0
 //
 //  Get the next trip
 //

@@ -34,6 +34,7 @@ public:
 protected:
   CEdit*     pEditNUMBER;
   CEdit*     pEditNAME;
+  CEdit*     pEditALTERNATE;
   CButton*   pButtonBIDIRECTIONAL;
   CButton*   pButtonCIRCULAR;
   CComboBox* pComboBoxOUTBOUND;

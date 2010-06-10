@@ -36,7 +36,7 @@ typedef struct TRIPGRAPHStruct
   long TRIPSrecordID;
   long PATTERNNAMESrecordID;
   int  patternIndex;
-  long tripTimes[RECORDIDS_KEPT];
+  long tripTimes[20];
 } TRIPGRAPHDef;
   
 #define TRIPGRAPH_FLAG_PATTERNACTIVE 0x0002
@@ -115,7 +115,7 @@ protected:
 //
 //  Stuff for keeping trip information in core
 //
-  TRIPGRAPHDef m_TRIPGRAPH[2][250];
+  TRIPGRAPHDef m_TRIPGRAPH[2][2500];
   int m_numTrips[2];
 
 //

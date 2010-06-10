@@ -444,7 +444,7 @@ HashObjFI<cKey, cValue> &HashObjFI<cKey, cValue>::operator|=( const HashObjFI &c
 }
 
 template <class cKey, class cValue>
-HashObjFI<cKey, cValue>::Element *HashObjFI<cKey, cValue>::findHead( register Element *b, const cKey &p ) const
+typename HashObjFI<cKey, cValue>::Element *HashObjFI<cKey, cValue>::findHead( register Element *b, const cKey &p ) const
 {
   for( b = b->bNext; b != NULL; b = b->bNext )
     if( b->key == p )

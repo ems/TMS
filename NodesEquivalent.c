@@ -5,8 +5,10 @@
 //
 BOOL NodesEquivalent(long fromNODESrecordID, long toNODESrecordID, long *pEquivalentTravelTime)
 {
-  int rcode2;
+  BOOL bCheckTravel;
+  int  rcode2;
 
+  bCheckTravel = (*pEquivalentTravelTime == NO_RECORD);
   *pEquivalentTravelTime = 0;
 
   if(fromNODESrecordID == toNODESrecordID)
@@ -22,8 +24,19 @@ BOOL NodesEquivalent(long fromNODESrecordID, long toNODESrecordID, long *pEquiva
   {
     if(CONNECTIONS.flags & CONNECTIONS_FLAG_EQUIVALENT)
     {
-      *pEquivalentTravelTime = CONNECTIONS.connectionTime;
-      return(TRUE);
+      if(bCheckTravel)
+      {
+        if(CONNECTIONS.flags & CONNECTIONS_FLAG_TRAVELTIME)
+        {
+          *pEquivalentTravelTime = CONNECTIONS.connectionTime;
+          return(TRUE);
+        }
+      }
+      else
+      {
+        *pEquivalentTravelTime = CONNECTIONS.connectionTime;
+        return(TRUE);
+      }
     }
     rcode2 = btrieve(B_GETNEXT, TMS_CONNECTIONS, &CONNECTIONS, &CONNECTIONSKey1, 1);
   }
@@ -38,8 +51,19 @@ BOOL NodesEquivalent(long fromNODESrecordID, long toNODESrecordID, long *pEquiva
     if(CONNECTIONS.flags & CONNECTIONS_FLAG_EQUIVALENT &&
           CONNECTIONS.flags & CONNECTIONS_FLAG_TWOWAY)
     {
-      *pEquivalentTravelTime = CONNECTIONS.connectionTime;
-      return(TRUE);
+      if(bCheckTravel)
+      {
+        if(CONNECTIONS.flags & CONNECTIONS_FLAG_TRAVELTIME)
+        {
+          *pEquivalentTravelTime = CONNECTIONS.connectionTime;
+          return(TRUE);
+        }
+      }
+      else
+      {
+        *pEquivalentTravelTime = CONNECTIONS.connectionTime;
+        return(TRUE);
+      }
     }
     rcode2 = btrieve(B_GETNEXT, TMS_CONNECTIONS, &CONNECTIONS, &CONNECTIONSKey1, 1);
   }

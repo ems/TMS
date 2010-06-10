@@ -77,7 +77,6 @@ BOOL CTMSApp::TextConvert()
     MessageBox(NULL, s, TMS, MB_OK);
     return(FALSE);
   }
-
 //
 //  Ok - Passed the tests - Onto the population step
 //

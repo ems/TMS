@@ -34,7 +34,7 @@ BOOL FAR TMSRPT18(TMSRPTPassedDataDef *pPassedData)
 //  Establish the type of deadhead load
 //
   nLoadType = GetPrivateProfileInt("Reports", "DriverLoadType", 1, TMSINIFile);
-  nLoadType = 19;
+  nLoadType = 20;
   if(nLoadType == 14)
   {
     fp = fopen("Driver Hours.txt", "r");
@@ -924,6 +924,54 @@ BOOL FAR TMSRPT18(TMSRPTPassedDataDef *pPassedData)
       DRIVERS.COMMENTSrecordID = NO_RECORD;
       DRIVERS.DIVISIONSrecordID = NO_RECORD;
       DRIVERS.DRIVERTYPESrecordID = 1;
+      memset(&DRIVERS.reserved1, 0x00, DRIVERS_RESERVED1_LENGTH);
+      memset(&DRIVERS.reserved2, 0x00, DRIVERS_RESERVED2_LENGTH);
+      DRIVERS.flags = 0L;
+      btrieve(B_INSERT, TMS_DRIVERS, &DRIVERS, &DRIVERSKey0, 0);
+    }  
+  }
+//
+//  Load type 20 - Arlington (Forsythe)
+//
+  else if(nLoadType == 20)
+  {
+    memset(&DRIVERS, 0x00, sizeof(DRIVERS));
+    DRIVERS.recordID = 0L;
+    sdatePrev = NO_RECORD;
+    ssort = 1;
+    while(fgets(inputString, sizeof(inputString), fp))
+    {
+      pch = strtok(inputString, "\t\n");
+      DRIVERS.DRIVERTYPESrecordID = atol(pch);
+      
+      pch = strtok(NULL, "\t\n");
+      strcpy(DRIVERS.badgeNumber, pch);
+      pad(DRIVERS.badgeNumber, DRIVERS_BADGENUMBER_LENGTH);
+
+      pch = strtok(NULL, "\t\n");
+      strcpy(lname, pch);
+      strcpy(DRIVERS.lastName, lname);
+      pad(DRIVERS.lastName, DRIVERS_LASTNAME_LENGTH);
+
+      pch = strtok(NULL, "\t\n");
+      strcpy(fname, pch);
+      strcpy(DRIVERS.firstName, fname);
+      pad(DRIVERS.firstName, DRIVERS_FIRSTNAME_LENGTH);
+
+      pch = strtok(NULL, "\t\n");
+      DRIVERS.hireDate = atol(pch);
+      DRIVERS.seniorityDate = DRIVERS.hireDate;
+
+      pch = strtok(NULL, "\t\n");
+      DRIVERS.senioritySort = atol(pch);
+
+      DRIVERS.vacationTime = 0;
+      DRIVERS.crewNumber = 0;
+      DRIVERS.telephoneArea = 0;
+      DRIVERS.telephoneNumber = 0;
+      DRIVERS.recordID++;
+      DRIVERS.COMMENTSrecordID = NO_RECORD;
+      DRIVERS.DIVISIONSrecordID = NO_RECORD;
       memset(&DRIVERS.reserved1, 0x00, DRIVERS_RESERVED1_LENGTH);
       memset(&DRIVERS.reserved2, 0x00, DRIVERS_RESERVED2_LENGTH);
       DRIVERS.flags = 0L;
